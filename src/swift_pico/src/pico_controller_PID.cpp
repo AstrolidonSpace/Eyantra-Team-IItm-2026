@@ -53,6 +53,9 @@ public:
         prev_drone_position[0] = 0.0f;
         prev_drone_position[1] = 0.0f;
         prev_drone_position[2] = 0.0f;
+        actual_vel_x = 0.0f;
+        actual_vel_y = 0.0f;
+        actual_vel_z = 0.0f;
 
         // Target setpoint [x, y, z] from Task 2A
         setpoint[0] = 1.5f;
@@ -66,9 +69,9 @@ public:
         cmd.rc_aux4 = 1500;
 
         // [CASCADED LATERAL] Outer Loop: Position Error -> Desired Velocity (tuned via /roll_pid, /pitch_pid)
-        Kp_pos[0] = 0.0f;  Kp_pos[1] = 0.0f;
-        Ki_pos[0] = 0.0f;  Ki_pos[1] = 0.0f;
-        Kd_pos[0] = 0.0f;  Kd_pos[1] = 0.0f;
+        Kp_pos[0] = 66.0f;  Kp_pos[1] = 66.0f;
+        Ki_pos[0] = 0.016f; Ki_pos[1] = 0.016f;
+        Kd_pos[0] = 90.0f;  Kd_pos[1] = 90.0f;
         pos_error_sum[0] = 0.0f; pos_error_sum[1] = 0.0f;
 
         // [CASCADED LATERAL] Inner Loop: Velocity Error -> Attitude Angle / RC PWM (fixed baseline)
@@ -79,19 +82,19 @@ public:
         prev_vel_error[0] = 0.0f; prev_vel_error[1] = 0.0f;
 
         // Legacy arrays for compatibility
-        Kp[0] = 0.0f;  Kp[1] = 0.0f;  Kp[2] = 0.0f;
-        Ki[0] = 0.0f;  Ki[1] = 0.0f;  Ki[2] = 0.0f;
-        Kd[0] = 0.0f;  Kd[1] = 0.0f;  Kd[2] = 0.0f;
+        Kp[0] = 66.0f;  Kp[1] = 66.0f;  Kp[2] = 3.0f;
+        Ki[0] = 0.016f; Ki[1] = 0.016f; Ki[2] = 0.045f;
+        Kd[0] = 90.0f;  Kd[1] = 90.0f;  Kd[2] = 2.2f;
 
         // [CHANGED] Outer Loop (Position PID -> Desired Velocity) tuned by GUI (/throttle_pid)
-        Kp_pos_z = 0.0f;
-        Ki_pos_z = 0.0f;
-        Kd_pos_z = 0.0f;
+        Kp_pos_z = 3.0f;
+        Ki_pos_z = 0.045f;
+        Kd_pos_z = 2.2f;
         pos_z_error_sum = 0.0f;
 
         // [CHANGED] Inner Loop (Velocity PID -> rc_throttle) hardcoded fixed baseline
-        Kp_vel_z = 15.0f;
-        Ki_vel_z = 0.0f;
+        Kp_vel_z = 22.0f;
+        Ki_vel_z = 2.0f;
         Kd_vel_z = 0.0f;
         vel_z_error_sum = 0.0f;
         prev_vel_z_error = 0.0f;
@@ -136,6 +139,9 @@ public:
 private:
     float drone_position[3];
     float prev_drone_position[3];
+    float actual_vel_x;
+    float actual_vel_y;
+    float actual_vel_z;
     float setpoint[3];
     CMD cmd;
 
@@ -166,7 +172,7 @@ private:
     float Ki_pos_z;
     float Kd_pos_z;
     float pos_z_error_sum;
-    const float max_vertical_vel = 3.0f; // Velocity clamp in marker-units/sec
+    const float max_vertical_vel = 5.0f; // Velocity clamp in marker-units/sec
 
     // [CHANGED] Inner Loop parameters for Throttle (Z)
     float Kp_vel_z;
@@ -280,12 +286,16 @@ private:
         pos_error_pub->publish(error_msg);
 
         // ================= CASCADED LATERAL CONTROL (ROLL & PITCH) =================
-        // Measure actual horizontal velocities (units/sec)
+        // Measure actual horizontal velocities (units/sec) with low-pass filter
         // drone_position[0] is X (Pitch axis), drone_position[1] is Y (Roll axis)
-        float actual_vel_x = (drone_position[0] - prev_drone_position[0]) / dt;
-        float actual_vel_y = (drone_position[1] - prev_drone_position[1]) / dt;
+        float raw_vel_x = (drone_position[0] - prev_drone_position[0]) / dt;
+        float raw_vel_y = (drone_position[1] - prev_drone_position[1]) / dt;
         prev_drone_position[0] = drone_position[0];
         prev_drone_position[1] = drone_position[1];
+
+        // EMA filter (alpha = 0.35) to reject WhyCode pixel discretization noise
+        actual_vel_x = 0.35f * raw_vel_x + 0.65f * actual_vel_x;
+        actual_vel_y = 0.35f * raw_vel_y + 0.65f * actual_vel_y;
 
         float actual_vel_lat[2] = { actual_vel_y, actual_vel_x }; // 0: Roll (Y), 1: Pitch (X)
 
@@ -320,9 +330,12 @@ private:
         }
 
         // ================= CASCADED THROTTLE (Z) =================
-        // A. Measure actual vertical velocity (units/sec)
-        float actual_vel_z = (drone_position[2] - prev_drone_position[2]) / dt;
+        // A. Measure actual vertical velocity (units/sec) with low-pass filter
+        float raw_vel_z = (drone_position[2] - prev_drone_position[2]) / dt;
         prev_drone_position[2] = drone_position[2];
+
+        // EMA filter (alpha = 0.25) to reject WhyCode camera pixel discretization noise
+        actual_vel_z = 0.25f * raw_vel_z + 0.75f * actual_vel_z;
 
         // B. OUTER LOOP (Controlled via GUI /throttle_pid): Height Error -> Target Velocity
         pos_z_error_sum += error[2] * dt;
