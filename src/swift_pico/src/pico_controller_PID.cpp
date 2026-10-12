@@ -65,10 +65,23 @@ public:
         cmd.rc_throttle = 1500;
         cmd.rc_aux4 = 1500;
 
-        // Roll (0) and Pitch (1) standard PID gains
-        Kp[0] = 0.0f;  Kp[1] = 0.0f;
-        Ki[0] = 0.0f;  Ki[1] = 0.0f;
-        Kd[0] = 0.0f;  Kd[1] = 0.0f;
+        // [CASCADED LATERAL] Outer Loop: Position Error -> Desired Velocity (tuned via /roll_pid, /pitch_pid)
+        Kp_pos[0] = 0.0f;  Kp_pos[1] = 0.0f;
+        Ki_pos[0] = 0.0f;  Ki_pos[1] = 0.0f;
+        Kd_pos[0] = 0.0f;  Kd_pos[1] = 0.0f;
+        pos_error_sum[0] = 0.0f; pos_error_sum[1] = 0.0f;
+
+        // [CASCADED LATERAL] Inner Loop: Velocity Error -> Attitude Angle / RC PWM (fixed baseline)
+        Kp_vel[0] = 25.0f; Kp_vel[1] = 25.0f;
+        Ki_vel[0] = 0.0f;  Ki_vel[1] = 0.0f;
+        Kd_vel[0] = 0.0f;  Kd_vel[1] = 0.0f;
+        vel_error_sum[0] = 0.0f; vel_error_sum[1] = 0.0f;
+        prev_vel_error[0] = 0.0f; prev_vel_error[1] = 0.0f;
+
+        // Legacy arrays for compatibility
+        Kp[0] = 0.0f;  Kp[1] = 0.0f;  Kp[2] = 0.0f;
+        Ki[0] = 0.0f;  Ki[1] = 0.0f;  Ki[2] = 0.0f;
+        Kd[0] = 0.0f;  Kd[1] = 0.0f;  Kd[2] = 0.0f;
 
         // [CHANGED] Outer Loop (Position PID -> Desired Velocity) tuned by GUI (/throttle_pid)
         Kp_pos_z = 0.0f;
@@ -132,6 +145,21 @@ private:
     float Kp[3];
     float Ki[3];
     float Kd[3];
+
+    // [CASCADED LATERAL] Roll (0 / Y) and Pitch (1 / X)
+    // Outer Loop: Position Error -> Desired Velocity
+    float Kp_pos[2];
+    float Ki_pos[2];
+    float Kd_pos[2];
+    float pos_error_sum[2];
+    const float max_horizontal_vel = 2.0f; // Velocity clamp in marker-units/sec
+
+    // Inner Loop: Velocity Error -> Attitude Angle / RC PWM Command
+    float Kp_vel[2];
+    float Ki_vel[2];
+    float Kd_vel[2];
+    float vel_error_sum[2];
+    float prev_vel_error[2];
 
     // [CHANGED] Outer Loop parameters for Throttle (Z)
     float Kp_pos_z;
@@ -217,6 +245,9 @@ private:
 
     void pitch_set_pid(const controller_msg::msg::PIDTune & pitch)
     {
+        Kp_pos[1] = pitch.kp;
+        Ki_pos[1] = pitch.ki;
+        Kd_pos[1] = pitch.kd;
         Kp[1] = pitch.kp;
         Ki[1] = pitch.ki;
         Kd[1] = pitch.kd;
@@ -224,6 +255,9 @@ private:
 
     void roll_set_pid(const controller_msg::msg::PIDTune & roll)
     {
+        Kp_pos[0] = roll.kp;
+        Ki_pos[0] = roll.ki;
+        Kd_pos[0] = roll.kd;
         Kp[0] = roll.kp;
         Ki[0] = roll.ki;
         Kd[0] = roll.kd;
@@ -245,16 +279,44 @@ private:
         error_msg.throttle_error = error[2];
         pos_error_pub->publish(error_msg);
 
-        // 3. Roll (Y) and Pitch (X) Position PID
+        // ================= CASCADED LATERAL CONTROL (ROLL & PITCH) =================
+        // Measure actual horizontal velocities (units/sec)
+        // drone_position[0] is X (Pitch axis), drone_position[1] is Y (Roll axis)
+        float actual_vel_x = (drone_position[0] - prev_drone_position[0]) / dt;
+        float actual_vel_y = (drone_position[1] - prev_drone_position[1]) / dt;
+        prev_drone_position[0] = drone_position[0];
+        prev_drone_position[1] = drone_position[1];
+
+        float actual_vel_lat[2] = { actual_vel_y, actual_vel_x }; // 0: Roll (Y), 1: Pitch (X)
+
         float out[2] = {0.0f, 0.0f};
         for (int i = 0; i < 2; i++)
         {
-            error_sum[i] += error[i];
-            error_sum[i] = std::clamp(error_sum[i], -windup_guard, windup_guard);
+            // A. OUTER LOOP: Position Error -> Desired Velocity (units/sec)
+            pos_error_sum[i] += error[i] * dt;
+            pos_error_sum[i] = std::clamp(pos_error_sum[i], -windup_guard, windup_guard);
 
-            float derivative = error[i] - prev_error[i];
-            out[i] = (Kp[i] * error[i]) + (Ki[i] * error_sum[i]) + (Kd[i] * derivative);
+            float pos_derivative = (error[i] - prev_error[i]) / dt;
             prev_error[i] = error[i];
+
+            float desired_vel = (Kp_pos[i] * error[i]) + 
+                                (Ki_pos[i] * pos_error_sum[i]) + 
+                                (Kd_pos[i] * pos_derivative);
+
+            // Clamp desired horizontal velocity to safe limits
+            desired_vel = std::clamp(desired_vel, -max_horizontal_vel, max_horizontal_vel);
+
+            // B. INNER LOOP: Velocity Error -> Attitude Angle / RC PWM Command
+            float vel_error = desired_vel - actual_vel_lat[i];
+            vel_error_sum[i] += vel_error * dt;
+            vel_error_sum[i] = std::clamp(vel_error_sum[i], -windup_guard, windup_guard);
+
+            float vel_derivative = (vel_error - prev_vel_error[i]) / dt;
+            prev_vel_error[i] = vel_error;
+
+            out[i] = (Kp_vel[i] * vel_error) + 
+                     (Ki_vel[i] * vel_error_sum[i]) + 
+                     (Kd_vel[i] * vel_derivative);
         }
 
         // ================= CASCADED THROTTLE (Z) =================
