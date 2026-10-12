@@ -7,6 +7,7 @@ This repository contains the complete ROS 2 workspace for the **e-Yantra Robotic
 ## 📋 Table of Contents
 - [Prerequisites](#-prerequisites)
 - [Workspace Setup & Build](#-workspace-setup--build)
+- [Interactive Architecture & Flight Simulator Web App](#-interactive-architecture--flight-simulator-web-app)
 - [How to Run](#-how-to-run)
   - [1. Launch Simulation Environment](#1-launch-simulation-environment)
   - [2. Run the PID Controller](#2-run-the-pid-controller)
@@ -56,6 +57,31 @@ source install/setup.bash
 
 > [!TIP]
 > Add `source ~/pico_ws/install/setup.bash` to your `~/.bashrc` to avoid sourcing the overlay in every new terminal.
+
+---
+
+## 🌐 Interactive Architecture & Flight Simulator Web App
+
+An interactive web application and live 3D quadrotor flight simulator is available in [`docs/`](docs/) to visualize and experiment with [`pico_controller_PID.cpp`](src/swift_pico/src/pico_controller_PID.cpp).
+
+### Launching the Web App Locally:
+```bash
+# Run local HTTP server
+python3 -m http.server 8080 --directory docs
+
+# Open in browser:
+xdg-open http://localhost:8080/
+```
+
+### What's Included:
+* **Interactive 3D Drone Flight Arena**: Drag and drop waypoints in real-time, observe simulated physics, and test wind gust disturbance recovery.
+* **Cascaded Altitude Visualizer**: Live demonstration showing why dual-loop velocity damping prevents vertical oscillations.
+* **Live Oscilloscope `/pos_error` Chart**: Real-time error plotting at 30.3 Hz.
+* **Live Actuator Telemetry**: RC PWM meters (`1000–2000 µs`) with neutral 1500 centering.
+* **Interactive Code Inspector**: Line-by-line annotations of the production C++ implementation.
+
+> [!NOTE]
+> See [`docs/README.md`](docs/README.md) for detailed documentation and free **GitHub Pages** deployment instructions.
 
 ---
 
@@ -135,6 +161,11 @@ ros2 topic echo /pos_error
 pico_ws/
 ├── README.md               # Setup and usage documentation
 ├── .gitignore              # Ignores build/, install/, and log/ artifacts
+├── docs/                   # Interactive architecture guide & web flight simulator
+│   ├── index.html          # Web application structure
+│   ├── style.css           # Modern aerospace dark theme styling
+│   ├── app.js              # Real-time physics engine, PID math & canvas renderer
+│   └── README.md           # Documentation & GitHub Pages deployment guide
 ├── task_1b/                # Task 1B rosbag files and submission zip
 ├── task_1c/                # Task 1C rosbag files and submission zip
 └── src/
