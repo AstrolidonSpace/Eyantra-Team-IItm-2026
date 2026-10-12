@@ -57,7 +57,7 @@ public:
         actual_vel_y = 0.0f;
         actual_vel_z = 0.0f;
 
-        // Target setpoint [x, y, z] from Task 2A
+        // Target setpoint [x, y, z] for Task 2A
         setpoint[0] = 1.5f;
         setpoint[1] = -1.5f;
         setpoint[2] = 13.0f;
@@ -68,31 +68,31 @@ public:
         cmd.rc_throttle = 1500;
         cmd.rc_aux4 = 1500;
 
-        // [CASCADED LATERAL] Outer Loop: Position Error -> Desired Velocity (tuned via /roll_pid, /pitch_pid)
+        // Roll and Pitch position loop gains (outer loop)
         Kp_pos[0] = 66.0f;  Kp_pos[1] = 66.0f;
         Ki_pos[0] = 0.016f; Ki_pos[1] = 0.016f;
         Kd_pos[0] = 90.0f;  Kd_pos[1] = 90.0f;
         pos_error_sum[0] = 0.0f; pos_error_sum[1] = 0.0f;
 
-        // [CASCADED LATERAL] Inner Loop: Velocity Error -> Attitude Angle / RC PWM (fixed baseline)
+        // Roll and Pitch velocity loop gains (inner loop)
         Kp_vel[0] = 25.0f; Kp_vel[1] = 25.0f;
         Ki_vel[0] = 0.0f;  Ki_vel[1] = 0.0f;
         Kd_vel[0] = 0.0f;  Kd_vel[1] = 0.0f;
         vel_error_sum[0] = 0.0f; vel_error_sum[1] = 0.0f;
         prev_vel_error[0] = 0.0f; prev_vel_error[1] = 0.0f;
 
-        // Legacy arrays for compatibility
+        // Default gain arrays
         Kp[0] = 66.0f;  Kp[1] = 66.0f;  Kp[2] = 3.0f;
         Ki[0] = 0.016f; Ki[1] = 0.016f; Ki[2] = 0.045f;
         Kd[0] = 90.0f;  Kd[1] = 90.0f;  Kd[2] = 2.2f;
 
-        // [CHANGED] Outer Loop (Position PID -> Desired Velocity) tuned by GUI (/throttle_pid)
+        // Altitude outer loop gains (position to vertical velocity)
         Kp_pos_z = 3.0f;
         Ki_pos_z = 0.045f;
         Kd_pos_z = 2.2f;
         pos_z_error_sum = 0.0f;
 
-        // [CHANGED] Inner Loop (Velocity PID -> rc_throttle) hardcoded fixed baseline
+        // Altitude inner loop gains (vertical velocity to throttle)
         Kp_vel_z = 22.0f;
         Ki_vel_z = 2.0f;
         Kd_vel_z = 0.0f;
@@ -152,29 +152,30 @@ private:
     float Ki[3];
     float Kd[3];
 
-    // [CASCADED LATERAL] Roll (0 / Y) and Pitch (1 / X)
-    // Outer Loop: Position Error -> Desired Velocity
+    // Roll (index 0) and Pitch (index 1) cascaded PID parameters
+    // Position loop (outer)
     float Kp_pos[2];
     float Ki_pos[2];
     float Kd_pos[2];
     float pos_error_sum[2];
-    const float max_horizontal_vel = 2.0f; // Velocity clamp in marker-units/sec
+    const float max_horizontal_vel = 2.0f;
 
-    // Inner Loop: Velocity Error -> Attitude Angle / RC PWM Command
+    // Velocity loop (inner)
     float Kp_vel[2];
     float Ki_vel[2];
     float Kd_vel[2];
     float vel_error_sum[2];
     float prev_vel_error[2];
 
-    // [CHANGED] Outer Loop parameters for Throttle (Z)
+    // Altitude cascaded PID parameters
+    // Position loop (outer)
     float Kp_pos_z;
     float Ki_pos_z;
     float Kd_pos_z;
     float pos_z_error_sum;
-    const float max_vertical_vel = 5.0f; // Velocity clamp in marker-units/sec
+    const float max_vertical_vel = 5.0f;
 
-    // [CHANGED] Inner Loop parameters for Throttle (Z)
+    // Velocity loop (inner)
     float Kp_vel_z;
     float Ki_vel_z;
     float Kd_vel_z;
@@ -241,7 +242,7 @@ private:
         }
     }
 
-    // [CHANGED] Connect GUI sliders directly to the OUTER position loop gains
+    // Callbacks to update PID gains from tuning topics
     void altitude_set_pid(const controller_msg::msg::PIDTune & alt)
     {
         Kp_pos_z = alt.kp;
@@ -274,26 +275,24 @@ private:
         auto cmd_msg = swift_msgs::msg::SwiftMsgs();
         auto error_msg = error_msg::msg::Error();
 
-        // 1. Position Errors (WhyCode Units)
-        error[0] = setpoint[1] - drone_position[1]; // roll_error (Y)
-        error[1] = setpoint[0] - drone_position[0]; // pitch_error (X)
-        error[2] = setpoint[2] - drone_position[2]; // throttle_error (Z)
+        // Calculate position error in marker coordinates
+        error[0] = setpoint[1] - drone_position[1]; // roll axis (Y)
+        error[1] = setpoint[0] - drone_position[0]; // pitch axis (X)
+        error[2] = setpoint[2] - drone_position[2]; // throttle axis (Z)
 
-        // 2. Publish /pos_error for GUI and rosbag
+        // Publish error for logging and evaluation
         error_msg.roll_error = error[0];
         error_msg.pitch_error = error[1];
         error_msg.throttle_error = error[2];
         pos_error_pub->publish(error_msg);
 
-        // ================= CASCADED LATERAL CONTROL (ROLL & PITCH) =================
-        // Measure actual horizontal velocities (units/sec) with low-pass filter
-        // drone_position[0] is X (Pitch axis), drone_position[1] is Y (Roll axis)
+        // Compute velocities and filter out sensor noise
         float raw_vel_x = (drone_position[0] - prev_drone_position[0]) / dt;
         float raw_vel_y = (drone_position[1] - prev_drone_position[1]) / dt;
         prev_drone_position[0] = drone_position[0];
         prev_drone_position[1] = drone_position[1];
 
-        // EMA filter (alpha = 0.35) to reject WhyCode pixel discretization noise
+        // Low-pass filter for lateral velocity estimates
         actual_vel_x = 0.35f * raw_vel_x + 0.65f * actual_vel_x;
         actual_vel_y = 0.35f * raw_vel_y + 0.65f * actual_vel_y;
 
@@ -302,7 +301,7 @@ private:
         float out[2] = {0.0f, 0.0f};
         for (int i = 0; i < 2; i++)
         {
-            // A. OUTER LOOP: Position Error -> Desired Velocity (units/sec)
+            // Outer loop: position error to desired velocity
             pos_error_sum[i] += error[i] * dt;
             pos_error_sum[i] = std::clamp(pos_error_sum[i], -windup_guard, windup_guard);
 
@@ -313,10 +312,9 @@ private:
                                 (Ki_pos[i] * pos_error_sum[i]) + 
                                 (Kd_pos[i] * pos_derivative);
 
-            // Clamp desired horizontal velocity to safe limits
             desired_vel = std::clamp(desired_vel, -max_horizontal_vel, max_horizontal_vel);
 
-            // B. INNER LOOP: Velocity Error -> Attitude Angle / RC PWM Command
+            // Inner loop: velocity error to control command
             float vel_error = desired_vel - actual_vel_lat[i];
             vel_error_sum[i] += vel_error * dt;
             vel_error_sum[i] = std::clamp(vel_error_sum[i], -windup_guard, windup_guard);
@@ -329,15 +327,14 @@ private:
                      (Kd_vel[i] * vel_derivative);
         }
 
-        // ================= CASCADED THROTTLE (Z) =================
-        // A. Measure actual vertical velocity (units/sec) with low-pass filter
+        // Altitude cascaded control
         float raw_vel_z = (drone_position[2] - prev_drone_position[2]) / dt;
         prev_drone_position[2] = drone_position[2];
 
-        // EMA filter (alpha = 0.25) to reject WhyCode camera pixel discretization noise
+        // Low-pass filter for vertical velocity
         actual_vel_z = 0.25f * raw_vel_z + 0.75f * actual_vel_z;
 
-        // B. OUTER LOOP (Controlled via GUI /throttle_pid): Height Error -> Target Velocity
+        // Outer loop: height error to desired vertical velocity
         pos_z_error_sum += error[2] * dt;
         pos_z_error_sum = std::clamp(pos_z_error_sum, -windup_guard, windup_guard);
 
@@ -348,10 +345,9 @@ private:
                               (Ki_pos_z * pos_z_error_sum) + 
                               (Kd_pos_z * pos_z_derivative);
 
-        // Clamp desired velocity to safe limits
         desired_vel_z = std::clamp(desired_vel_z, -max_vertical_vel, max_vertical_vel);
 
-        // C. INNER LOOP (Fixed baseline): Velocity Error -> Throttle PWM
+        // Inner loop: velocity error to throttle command
         float vel_z_error = desired_vel_z - actual_vel_z;
         vel_z_error_sum += vel_z_error * dt;
         vel_z_error_sum = std::clamp(vel_z_error_sum, -windup_guard, windup_guard);
@@ -362,19 +358,18 @@ private:
         float out_throttle = (Kp_vel_z * vel_z_error) + 
                              (Ki_vel_z * vel_z_error_sum) + 
                              (Kd_vel_z * vel_z_derivative);
-        // ========================================================
 
-        // 4. Map to Neutral 1500 Midpoint
+        // Map controller output to RC command range (center 1500)
         int target_roll     = static_cast<int>(1500.0f + out[0]);
         int target_pitch    = static_cast<int>(1500.0f + out[1]);
         int target_throttle = static_cast<int>(1500.0f - out_throttle);
 
-        // 5. Output Clamping & Arm Flag
+        // Clamp commands within safe boundaries
         cmd_msg.rc_roll     = std::clamp(target_roll, min_values[0], max_values[0]);
         cmd_msg.rc_pitch    = std::clamp(target_pitch, min_values[1], max_values[1]);
         cmd_msg.rc_throttle = std::clamp(target_throttle, min_values[2], max_values[2]);
         cmd_msg.rc_yaw      = 1500;
-        cmd_msg.rc_aux4     = 2000; // Keep drone armed
+        cmd_msg.rc_aux4     = 2000;
 
         command_pub->publish(cmd_msg);
     }
