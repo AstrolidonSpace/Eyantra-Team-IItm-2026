@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Interactive architecture breakdown and live flight simulation for pico_controller_PID.cpp - e-Yantra Khojo Drone theme">
+    <title>pico_controller_PID.cpp — Architecture & Interactive Simulator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Top Navigation -->
+    <header class="navbar" id="main-nav">
+        <div class="nav-brand">
+            <span class="brand-badge">ROS 2 Humble</span>
+            <span class="brand-title">pico_controller_PID.cpp</span>
+            <span class="brand-sub">Khojo-Drone (KD_6479)</span>
+        </div>
+        <nav class="nav-links">
+            <a href="#overview" class="nav-link active">Overview</a>
+            <a href="#simulator" class="nav-link">Live Simulator</a>
+            <a href="#pipeline" class="nav-link">Control Pipeline</a>
+            <a href="#cascaded" class="nav-link">Cascaded Z Loop</a>
+            <a href="#code" class="nav-link">Source Explorer</a>
+            <a href="#topics" class="nav-link">ROS 2 Topics</a>
+        </nav>
+        <div class="nav-status">
+            <span class="status-dot"></span>
+            <span class="status-text">Node: pico_controller (30.3 Hz)</span>
+        </div>
+    </header>
+
+    <main class="content-container">
+        <!-- Hero Section -->
+        <section class="hero-section" id="overview">
+            <div class="hero-tagline">
+                <span class="pill pill-cyan">eYRC 2026-27</span>
+                <span class="pill pill-purple">Dual-Loop Cascaded PID</span>
+                <span class="pill pill-emerald">WhyCode Feedback</span>
+            </div>
+            <h1 class="hero-heading">Architecture & Interactive Guide for <code class="code-highlight">pico_controller_PID.cpp</code></h1>
+            <p class="hero-desc">
+                This document and interactive flight simulation explain the internal mechanics of the closed-loop flight controller running the Swift Pico quadrotor. Explore how WhyCode optical localization, lateral position PIDs, and cascaded altitude velocity loops compute 1000–2000 µs RC PWM commands.
+            </p>
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-val text-cyan">33 ms</div>
+                    <div class="stat-lbl">Sample Time (30.3 Hz)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val text-emerald">Cascaded</div>
+                    <div class="stat-lbl">Altitude Architecture</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val text-purple">&plusmn; 40.0</div>
+                    <div class="stat-lbl">Integral Windup Guard</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val text-amber">1000–2000</div>
+                    <div class="stat-lbl">RC PWM Range (1500 Mid)</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Interactive Simulator Section -->
+        <section class="sim-section" id="simulator">
+            <div class="section-header">
+                <span class="section-badge">Interactive Simulation</span>
+                <h2>Live Drone Flight & Cascaded PID Simulator</h2>
+                <p>Interact with the live mathematical model from <code>pico_controller_PID.cpp</code>. Drag the setpoint in the flight arena, adjust PID gains, and observe real-time telemetry and error responses.</p>
+            </div>
+
+            <div class="sim-grid">
+                <!-- Flight Canvas Area -->
+                <div class="sim-view-card">
+                    <div class="sim-view-header">
+                        <div class="view-title">
+                            <span class="pulse-icon"></span>
+                            <span>Drone Flight Arena (3D WhyCode Projection)</span>
+                        </div>
+                        <div class="view-presets">
+                            <button class="btn-preset active" id="preset-default">Default [1.5, -1.5, 13.0]</button>
+                            <button class="btn-preset" id="preset-hover">Hover Center [0, 0, 10.0]</button>
+                            <button class="btn-preset" id="preset-step">Corner Step [-2, 2, 16.0]</button>
+                            <button class="btn-preset btn-disturb" id="btn-disturb">Simulate Wind Gust</button>
+                        </div>
+                    </div>
+                    <div class="canvas-wrapper">
+                        <canvas id="flightCanvas" width="700" height="420"></canvas>
+                        <div class="canvas-overlay">
+                            <div class="overlay-tag" id="overlay-pos">Drone: (0.00, 0.00, 0.00)</div>
+                            <div class="overlay-tag" id="overlay-sp">Target: (1.50, -1.50, 13.00)</div>
+                            <div class="overlay-tag" id="overlay-status">State: ARMED (rc_aux4: 2000)</div>
+                        </div>
+                    </div>
+                    <div class="sim-footer-notes">
+                        <span>💡 <strong>Tip:</strong> Click and drag anywhere inside the arena to move the target waypoint dynamically!</span>
+                    </div>
+                </div>
+
+                <!-- Live Telemetry & RC Output -->
+                <div class="sim-telemetry-card">
+                    <h3>Actuator Telemetry (/drone_command)</h3>
+                    <div class="rc-meters">
+                        <div class="rc-item">
+                            <div class="rc-label">
+                                <span>Roll PWM (rc_roll)</span>
+                                <span class="rc-value" id="val-rc-roll">1500 µs</span>
+                            </div>
+                            <div class="rc-bar-bg"><div class="rc-bar-fill" id="bar-rc-roll" style="width: 50%;"></div><div class="rc-center-mark"></div></div>
+                        </div>
+                        <div class="rc-item">
+                            <div class="rc-label">
+                                <span>Pitch PWM (rc_pitch)</span>
+                                <span class="rc-value" id="val-rc-pitch">1500 µs</span>
+                            </div>
+                            <div class="rc-bar-bg"><div class="rc-bar-fill" id="bar-rc-pitch" style="width: 50%;"></div><div class="rc-center-mark"></div></div>
+                        </div>
+                        <div class="rc-item">
+                            <div class="rc-label">
+                                <span>Throttle PWM (rc_throttle)</span>
+                                <span class="rc-value" id="val-rc-throttle">1500 µs</span>
+                            </div>
+                            <div class="rc-bar-bg"><div class="rc-bar-fill bg-emerald" id="bar-rc-throttle" style="width: 50%;"></div><div class="rc-center-mark"></div></div>
+                        </div>
+                        <div class="rc-item">
+                            <div class="rc-label">
+                                <span>Yaw PWM (rc_yaw)</span>
+                                <span class="rc-value">1500 µs (Locked)</span>
+                            </div>
+                            <div class="rc-bar-bg"><div class="rc-bar-fill" style="width: 50%;"></div><div class="rc-center-mark"></div></div>
+                        </div>
+                    </div>
+
+                    <div class="telemetry-readout">
+                        <div class="tel-row">
+                            <span class="tel-name">Target Vertical Vel ($v_{z,\text{des}}$):</span>
+                            <span class="tel-data text-cyan" id="tel-des-vel">0.00 m/s</span>
+                        </div>
+                        <div class="tel-row">
+                            <span class="tel-name">Actual Vertical Vel ($v_{z,\text{act}}$):</span>
+                            <span class="tel-data text-emerald" id="tel-act-vel">0.00 m/s</span>
+                        </div>
+                        <div class="tel-row">
+                            <span class="tel-name">Z Velocity Error ($e_{v_z}$):</span>
+                            <span class="tel-data text-amber" id="tel-vel-err">0.00 m/s</span>
+                        </div>
+                        <div class="tel-row">
+                            <span class="tel-name">Heartbeat Frame:</span>
+                            <span class="tel-data text-purple">pico_controller_active (10 Hz)</span>
+                        </div>
+                    </div>
+
+                    <!-- Live /pos_error Chart -->
+                    <div class="chart-wrapper">
+                        <div class="chart-header">
+                            <span>Live /pos_error Stream</span>
+                            <div class="chart-legend">
+                                <span class="legend-dot dot-roll"></span> Roll (Y)
+                                <span class="legend-dot dot-pitch"></span> Pitch (X)
+                                <span class="legend-dot dot-alt"></span> Altitude (Z)
+                            </div>
+                        </div>
+                        <canvas id="errorChart" width="360" height="150"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gain Tuning Controls -->
+            <div class="tuning-card">
+                <div class="tuning-header">
+                    <h3>Dynamic PID Gain Tuning (Mirroring ROS 2 /throttle_pid, /pitch_pid, /roll_pid)</h3>
+                    <button class="btn-preset" id="btn-reset-gains">Reset to Optimized Defaults</button>
+                </div>
+                <div class="gain-grid">
+                    <!-- Roll Gains -->
+                    <div class="gain-group">
+                        <div class="group-title text-cyan">Roll Controller (Y-Axis)</div>
+                        <div class="slider-row">
+                            <label>Kp: <span id="lbl-kp-roll">66.0</span></label>
+                            <input type="range" id="slider-kp-roll" min="0" max="150" step="1" value="66">
+                        </div>
+                        <div class="slider-row">
+                            <label>Ki: <span id="lbl-ki-roll">0.016</span></label>
+                            <input type="range" id="slider-ki-roll" min="0" max="0.1" step="0.002" value="0.016">
+                        </div>
+                        <div class="slider-row">
+                            <label>Kd: <span id="lbl-kd-roll">90.0</span></label>
+                            <input type="range" id="slider-kd-roll" min="0" max="200" step="1" value="90">
+                        </div>
+                    </div>
+
+                    <!-- Pitch Gains -->
+                    <div class="gain-group">
+                        <div class="group-title text-purple">Pitch Controller (X-Axis)</div>
+                        <div class="slider-row">
+                            <label>Kp: <span id="lbl-kp-pitch">66.0</span></label>
+                            <input type="range" id="slider-kp-pitch" min="0" max="150" step="1" value="66">
+                        </div>
+                        <div class="slider-row">
+                            <label>Ki: <span id="lbl-ki-pitch">0.016</span></label>
+                            <input type="range" id="slider-ki-pitch" min="0" max="0.1" step="0.002" value="0.016">
+                        </div>
+                        <div class="slider-row">
+                            <label>Kd: <span id="lbl-kd-pitch">90.0</span></label>
+                            <input type="range" id="slider-kd-pitch" min="0" max="200" step="1" value="90">
+                        </div>
+                    </div>
+
+                    <!-- Cascaded Throttle Outer Gains -->
+                    <div class="gain-group">
+                        <div class="group-title text-emerald">Altitude Outer Loop (Height &rarr; Target Vel)</div>
+                        <div class="slider-row">
+                            <label>Kp_pos_z: <span id="lbl-kp-posz">2.49</span></label>
+                            <input type="range" id="slider-kp-posz" min="0" max="10" step="0.05" value="2.49">
+                        </div>
+                        <div class="slider-row">
+                            <label>Ki_pos_z: <span id="lbl-ki-posz">0.024</span></label>
+                            <input type="range" id="slider-ki-posz" min="0" max="0.1" step="0.002" value="0.024">
+                        </div>
+                        <div class="slider-row">
+                            <label>Kd_pos_z: <span id="lbl-kd-posz">1.80</span></label>
+                            <input type="range" id="slider-kd-posz" min="0" max="10" step="0.05" value="1.80">
+                        </div>
+                    </div>
+
+                    <!-- Cascaded Throttle Inner Baseline -->
+                    <div class="gain-group">
+                        <div class="group-title text-amber">Altitude Inner Loop (Velocity &rarr; PWM)</div>
+                        <div class="slider-row">
+                            <label>Kp_vel_z (Hardcoded): <span>15.0</span></label>
+                            <input type="range" min="0" max="30" step="1" value="15" disabled>
+                        </div>
+                        <div class="slider-row">
+                            <label>Max Desired Vel Clamp: <span>&plusmn; 3.0 m/s</span></label>
+                            <input type="range" min="1" max="10" step="0.5" value="3" disabled>
+                        </div>
+                        <div class="slider-hint">
+                            *Fixed baseline loop inside C++ lines 80-84 to guarantee dampening regardless of GUI changes.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pipeline Architecture Section -->
+        <section class="pipeline-section" id="pipeline">
+            <div class="section-header">
+                <span class="section-badge">Signal Architecture</span>
+                <h2>Step-by-Step Data Pipeline</h2>
+                <p>Click any pipeline stage below to view its algorithmic formulation and exact implementation details in the C++ codebase.</p>
+            </div>
+
+            <div class="pipeline-flow">
+                <div class="pipe-step active" data-target="pipe-whycode">
+                    <div class="step-num">01</div>
+                    <div class="step-title">WhyCode Perception</div>
+                    <div class="step-desc">/whycode_node/markers &rarr; drone_position[3]</div>
+                </div>
+                <div class="pipe-arrow">&rarr;</div>
+                <div class="pipe-step" data-target="pipe-error">
+                    <div class="step-num">02</div>
+                    <div class="step-title">Error Computation</div>
+                    <div class="step-desc">error[i] = setpoint[i] - position[i]</div>
+                </div>
+                <div class="pipe-arrow">&rarr;</div>
+                <div class="pipe-step" data-target="pipe-lateral">
+                    <div class="step-num">03</div>
+                    <div class="step-title">Lateral Roll & Pitch PID</div>
+                    <div class="step-desc">Single-loop position PID with anti-windup</div>
+                </div>
+                <div class="pipe-arrow">&rarr;</div>
+                <div class="pipe-step" data-target="pipe-cascaded">
+                    <div class="step-num">04</div>
+                    <div class="step-title">Cascaded Z Altitude</div>
+                    <div class="step-desc">Outer Height &rarr; Inner Velocity Controller</div>
+                </div>
+                <div class="pipe-arrow">&rarr;</div>
+                <div class="pipe-step" data-target="pipe-pwm">
+                    <div class="step-num">05</div>
+                    <div class="step-title">PWM Mapping & Arm</div>
+                    <div class="step-desc">1500 midpoint &plusmn; output [1000, 2000]</div>
+                </div>
+            </div>
+
+            <!-- Dynamic Pipeline Detail Card -->
+            <div class="pipe-detail-box" id="pipeline-detail-content">
+                <!-- Dynamically swapped via JS -->
+            </div>
+        </section>
+
+        <!-- Deep Dive: Cascaded Control -->
+        <section class="cascaded-section" id="cascaded">
+            <div class="section-header">
+                <span class="section-badge">Mathematical Foundation</span>
+                <h2>Why Cascaded Control for Altitude (Z)?</h2>
+                <p>Understanding why standard single-loop PID fails on drone altitude, and how the dual-loop architecture solves vertical oscillations.</p>
+            </div>
+
+            <div class="cascaded-grid">
+                <div class="theory-card">
+                    <div class="theory-header text-rose">
+                        <span class="theory-icon">&times;</span>
+                        <h3>The Single-Loop Problem</h3>
+                    </div>
+                    <p>In quadrotors, the vertical axis is heavily affected by gravity and battery voltage sag. When an aggressive position error occurs, a single PID loop calculates a high throttle value. Because the drone cannot decelerate instantly (it must wait for gravity and drag), it consistently overshoots the target setpoint, entering undamped vertical oscillations ("yo-yo" effect).</p>
+                    <div class="formula-box">
+                        <code>Output = Kp &times; (Z_sp - Z) &rarr; Violent overshoots & floor collisions</code>
+                    </div>
+                </div>
+
+                <div class="theory-card">
+                    <div class="theory-header text-emerald">
+                        <span class="theory-icon">&check;</span>
+                        <h3>The Cascaded Solution (In pico_controller_PID.cpp)</h3>
+                    </div>
+                    <p>By decoupling height error into two nested loops, the outer loop only requests a <strong>realistic target velocity</strong> ($v_{z,\text{des}}$) capped at 3 m/s. The inner loop acts as an automatic brake: if the drone moves upwards too fast, the velocity error turns negative and instantly reduces thrust before overshoot occurs.</p>
+                    <div class="formula-box">
+                        <code>Outer Loop: v_z_des = std::clamp(Kp_pos &times; e_z + ..., -3.0, 3.0)</code><br>
+                        <code>Inner Loop: Throttle = Kp_vel &times; (v_z_des - actual_vel_z)</code>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Code Explorer Section -->
+        <section class="code-section" id="code">
+            <div class="section-header">
+                <span class="section-badge">Source Code Explorer</span>
+                <h2>Interactive Code Inspector</h2>
+                <p>Inspect the actual production C++ implementation of <code>pico_controller_PID.cpp</code> with contextual explanations.</p>
+            </div>
+
+            <div class="code-tabs">
+                <button class="code-tab active" data-tab="tab-pid">pid() Main Loop (Lines 232–305)</button>
+                <button class="code-tab" data-tab="tab-init">Constructor & Arming (Lines 47–121)</button>
+                <button class="code-tab" data-tab="tab-subs">WhyCode & Tuning Callbacks (Lines 201–230)</button>
+            </div>
+
+            <div class="code-viewer-container">
+                <div class="code-display" id="code-snippet-box">
+                    <pre><code class="language-cpp" id="code-content"></code></pre>
+                </div>
+                <div class="code-notes" id="code-notes-box">
+                    <h4>Key Architectural Highlights</h4>
+                    <ul id="code-notes-list"></ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- ROS 2 Interface Matrix -->
+        <section class="topics-section" id="topics">
+            <div class="section-header">
+                <span class="section-badge">Interface Reference</span>
+                <h2>ROS 2 Node Interface Matrix</h2>
+                <p>Complete topic specifications and CLI validation commands for team members.</p>
+            </div>
+
+            <div class="table-card">
+                <table class="topics-table">
+                    <thead>
+                        <tr>
+                            <th>Direction</th>
+                            <th>Topic</th>
+                            <th>Message Type</th>
+                            <th>Rate</th>
+                            <th>CLI Diagnostic Command</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="tag tag-pub">PUBLISH</span></td>
+                            <td><code>/drone_command</code></td>
+                            <td><code>swift_msgs/msg/SwiftMsgs</code></td>
+                            <td>~30 Hz</td>
+                            <td><code>ros2 topic echo /drone_command</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag tag-pub">PUBLISH</span></td>
+                            <td><code>/pos_error</code></td>
+                            <td><code>error_msg/msg/Error</code></td>
+                            <td>~30 Hz</td>
+                            <td><code>ros2 topic echo /pos_error</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag tag-pub">PUBLISH</span></td>
+                            <td><code>/controller_heartbeat</code></td>
+                            <td><code>std_msgs/msg/Header</code></td>
+                            <td>10 Hz</td>
+                            <td><code>ros2 topic hz /controller_heartbeat</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag tag-sub">SUBSCRIBE</span></td>
+                            <td><code>/whycode_node/markers</code></td>
+                            <td><code>whycode_interfaces/msg/MarkerArray</code></td>
+                            <td>~30 Hz</td>
+                            <td><code>ros2 topic echo /whycode_node/markers</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag tag-sub">SUBSCRIBE</span></td>
+                            <td><code>/throttle_pid</code></td>
+                            <td><code>controller_msg/msg/PIDTune</code></td>
+                            <td>On change</td>
+                            <td><code>ros2 topic pub --once /throttle_pid ...</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag tag-sub">SUBSCRIBE</span></td>
+                            <td><code>/pitch_pid</code></td>
+                            <td><code>controller_msg/msg/PIDTune</code></td>
+                            <td>On change</td>
+                            <td><code>ros2 topic pub --once /pitch_pid ...</code></td>
+                        </tr>
+                        <tr>
+                            <td><span class="tag tag-sub">SUBSCRIBE</span></td>
+                            <td><code>/roll_pid</code></td>
+                            <td><code>controller_msg/msg/PIDTune</code></td>
+                            <td>On change</td>
+                            <td><code>ros2 topic pub --once /roll_pid ...</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="doc-footer">
+            <div class="footer-content">
+                <p><strong>e-Yantra Robotics Competition (eYRC 2026-27)</strong> &bull; Khojo-Drone Theme &bull; Team KD_6479</p>
+                <p>Repository: <a href="https://github.com/AstrolidonSpace/Eyantra-Team-IItm-2026" target="_blank">AstrolidonSpace/Eyantra-Team-IItm-2026</a></p>
+            </div>
+        </footer>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
