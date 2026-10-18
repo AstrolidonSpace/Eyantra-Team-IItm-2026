@@ -20,6 +20,7 @@ find_package(controller_msg     REQUIRED)  # PID Tuning msg
 find_package(error_msg          REQUIRED)  # Error visualization msg
 find_package(whycode_interfaces REQUIRED)  # WhyCode interfaces
 find_package(std_msgs           REQUIRED)  # Header, for /controller_heartbeat
+find_package(waypoint_navigation REQUIRED) # Custom action and service interfaces
 
 # --- mujoco_bridge (pre-built executable) ------------------------------------
 # Both files live in config/. The binary has RPATH=$ORIGIN, so libmujoco must be
@@ -75,5 +76,35 @@ install(
 )
 
 # Add the LQR controller and the waypoint service, client and server nodes below this line.
+# Install python nodes for Task 2B (both with and without .py extension)
+install(
+  PROGRAMS src/pico_server.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME pico_server
+)
+install(
+  PROGRAMS src/pico_server.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(
+  PROGRAMS src/pico_client.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME pico_client
+)
+install(
+  PROGRAMS src/pico_client.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(
+  PROGRAMS src/waypoint_service.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME waypoint_service
+)
+install(
+  PROGRAMS src/waypoint_service.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 ament_package()
