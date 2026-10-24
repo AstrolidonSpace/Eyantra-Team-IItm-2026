@@ -72,12 +72,30 @@ Tabbed, syntax-highlighted code explorer matching production lines in [`src/swif
 
 ---
 
+## 🧭 Task 2C: Interactive Path Planner & Vision Perception (`planner.html`)
+
+Access the dedicated Task 2C web app at:
+👉 **[http://localhost:8080/planner.html](http://localhost:8080/planner.html)**
+
+### What's Included in the Task 2C Explorer:
+* **Interactive $11 \times 11$ Disaster Arena Canvas**: Click any intersection to add/relocate survivors, test benchmark layouts, and observe the live drone flight with 3-second hold timers.
+* **Perception Pipeline Step-by-Step**: Interactive visual breakdown of ArUco boundary detection, perspective warping to $900 \times 900$, dual-range HSV red masking, and spatial moment grid snapping.
+* **Algorithm Showdown: TSP vs Greedy Nearest Neighbor**: Clear comparison illustrating why greedy nearest-neighbor traps the drone into crossing the arena diagonally (20.94 m vs 19.38 m), and why combinatorial brute-force TSP is globally optimal.
+* **Live 24-Route Permutation Explorer**: Searchable and filterable table of all $4! = 24$ candidate routes with distance deltas, leg breakdowns, and real-time canvas route preview on click.
+* **Metric Coordinate Table**: Dynamic WhyCode $(X, Y)$ lookups from `grid_whycode_coordinates.csv`.
+
+---
+
 ## 📂 File Structure
 
 ```text
 docs/
-├── index.html       # Webpage structure, layout, and semantics
-├── style.css        # Modern aerospace dark mode design system & glassmorphism
-├── app.js           # Interactive physics engine, PID math, canvas renderer & UI sync
-└── README.md        # Documentation and hosting guide (this file)
+├── index.html                   # Task 2A: Flight Controller Simulator & Architecture Guide
+├── planner.html                 # Task 2C: Vision Pipeline & Optimal TSP Route Planner Explorer
+├── style.css                    # Unified aerospace dark mode design system & glassmorphism
+├── app.js                       # Task 2A physics engine, PID math, canvas renderer & UI sync
+├── planner.js                   # Task 2C 11x11 arena canvas, TSP solver, flight animator & HUD
+├── grid_whycode_coordinates.json# Metric WhyCode (X, Y) coordinate lookup table
+├── task2c_route.png             # Checkpoint route image from Task 2C simulation
+└── README.md                    # Documentation and hosting guide (this file)
 ```

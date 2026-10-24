@@ -12,9 +12,10 @@ This repository contains the complete ROS 2 workspace for the **e-Yantra Robotic
   - [1. Launch Simulation Environment](#1-launch-simulation-environment)
   - [2. Task 2A: Position Hold PID Controller](#2-task-2a-position-hold-pid-controller)
   - [3. Task 2B: Autonomous Waypoint Navigation (Actions & Services)](#3-task-2b-autonomous-waypoint-navigation-actions--services)
-  - [4. PID Tuning GUI (Optional)](#4-pid-tuning-gui-optional)
-  - [5. Run Task 1A (Vision Pipeline)](#5-run-task-1a-vision-pipeline)
-  - [6. Replaying Task Bags (Task 1B / 1C / 2A / 2B)](#6-replaying-task-bags-task-1b--1c--2a--2b)
+  - [4. Task 2C: Vision-Based Survivor Detection & TSP Path Planning Navigation](#4-task-2c-vision-based-survivor-detection--tsp-path-planning-navigation)
+  - [5. PID Tuning GUI (Optional)](#5-pid-tuning-gui-optional)
+  - [6. Run Task 1A (Vision Pipeline)](#6-run-task-1a-vision-pipeline)
+  - [7. Replaying Task Bags (Task 1B / 1C / 2A / 2B / 2C)](#7-replaying-task-bags-task-1b--1c--2a--2b--2c)
 - [Project Directory Structure](#-project-directory-structure)
 - [Troubleshooting](#-troubleshooting)
 
@@ -127,7 +128,7 @@ The controller subscribes to WhyCode marker feedback (`/whycode_node/markers`), 
 
 ### 3. Task 2B: Autonomous Waypoint Navigation (Actions & Services)
 
-Task 2B implements a complete rescue route sequence navigating through four 3D waypoints (`wp1` $\rightarrow$ `wp4`) using ROS 2 Actions and Services:
+Task 2B implements a rescue route sequence navigating through four 3D waypoints (`wp1` $\rightarrow$ `wp4`) using ROS 2 Actions and Services:
 * **Waypoint Service** (`GetWaypoints.srv`): Serves the predefined waypoints in exact sequence.
 * **Action Client** (`pico_client`): Fetches waypoints and sends them one by one as goals to the action server.
 * **Action Server** (`pico_server`): Hosts `NavToWaypoint.action`, controls flight via cascaded PID, streams real-time pose and hold-time feedback, stabilizes within $\pm 0.4$ units across all axes for $\ge 3$ consecutive seconds, and returns total hover settling time.
@@ -148,9 +149,6 @@ ros2 launch swift_pico swift_pico_simulation.launch.py
 source /opt/ros/humble/setup.bash
 source ~/pico_ws/install/setup.bash
 ros2 run swift_pico waypoint_service_cpp
-
-# Or Python:
-# ros2 run swift_pico waypoint_service
 ```
 
 #### Step 3: Run Action Client (waits for server)
@@ -159,9 +157,6 @@ ros2 run swift_pico waypoint_service_cpp
 source /opt/ros/humble/setup.bash
 source ~/pico_ws/install/setup.bash
 ros2 run swift_pico pico_client_cpp
-
-# Or Python:
-# ros2 run swift_pico pico_client
 ```
 
 #### Step 4: Run Action Server (starts flight navigation)
@@ -170,14 +165,70 @@ ros2 run swift_pico pico_client_cpp
 source /opt/ros/humble/setup.bash
 source ~/pico_ws/install/setup.bash
 ros2 run swift_pico pico_server_cpp
-
-# Or Python:
-# ros2 run swift_pico pico_server
 ```
 
 ---
 
-### 4. PID Tuning GUI (Optional)
+### 4. Task 2C: Vision-Based Survivor Detection & TSP Path Planning Navigation
+
+In Task 2C, the drone dynamically discovers its own waypoints by analyzing a top-down camera frame of the disaster zone, detecting all critical survivors, planning an optimal route, and executing full autonomous flight:
+
+1. **Latched Camera Capture**: Subscribes to `/image_raw` using `RELIABLE` + `TRANSIENT_LOCAL` QoS to capture one latched arena frame, then drops the subscription.
+2. **ArUco Arena Rectification**: Detects boundary markers (`80, 85, 90, 95`) and performs perspective warping to standard $900 \times 900$ pixels.
+3. **HSV Color Segmentation**: Detects all Critical Survivors (red triangles) and snaps them to the nearest grid intersections (`A1`–`K11`).
+4. **Coordinate Lookup**: Converts grid intersection labels to metric WhyCode coordinates via `grid_whycode_coordinates.csv` ($Z = 13.0$).
+5. **Globally Optimal TSP Path Planner**: Computes the globally shortest visiting sequence across all $4! = 24$ permutations starting from arena centre (`F6`), eliminating greedy nearest-neighbor traps.
+6. **Autonomous Action Execution**: Serves the planned route via `/waypoints` (`GetWaypoints.srv`). The action client and cascaded PID action server navigate through each survivor, holding within $\pm 0.4$ units for $\ge 3$ consecutive seconds.
+
+#### Running Task 2C:
+
+##### Step 1: Launch Simulator
+```bash
+# Terminal 1
+source /opt/ros/humble/setup.bash
+source ~/pico_ws/install/setup.bash
+ros2 launch swift_pico swift_pico_simulation.launch.py
+```
+
+##### Step 2: Run Waypoint Service
+```bash
+# Terminal 2
+source /opt/ros/humble/setup.bash
+source ~/pico_ws/install/setup.bash
+ros2 run swift_pico waypoint_service
+```
+
+##### Checkpoint Validation (Optional):
+```bash
+ros2 service call /waypoints waypoint_navigation/srv/GetWaypoints "{get_waypoints: true}"
+```
+Returns the dynamically planned route:
+```text
+poses: [(-2.42, -1.21, 13.0), (-2.43, 1.22, 13.0), (1.22, 2.44, 13.0), (2.44, -1.21, 13.0)]
+marker_ids: ['H7', 'H5', 'E4', 'D7']
+```
+
+##### Step 3: Run Action Client
+```bash
+# Terminal 3
+source /opt/ros/humble/setup.bash
+source ~/pico_ws/install/setup.bash
+ros2 run swift_pico pico_client_cpp
+```
+
+##### Step 4: Run Action Server
+```bash
+# Terminal 4
+source /opt/ros/humble/setup.bash
+source ~/pico_ws/install/setup.bash
+ros2 run swift_pico pico_server_cpp
+```
+
+* **Mission Performance**: Complete 4-survivor rescue run completed in **~33 seconds** (well inside the 60-second full marks requirement, 100-second maximum cap).
+
+---
+
+### 5. PID Tuning GUI (Optional)
 To tune Roll, Pitch, and Throttle PID values live via the tuning slider interface:
 
 ```bash
@@ -189,7 +240,7 @@ ros2 launch pid_tune pid_tune_drone.launch.py
 
 ---
 
-### 5. Run Task 1A (Vision Pipeline)
+### 6. Run Task 1A (Vision Pipeline)
 To test ArUco marker detection and arena corner extraction:
 
 ```bash
@@ -200,7 +251,7 @@ Results will be output to `image_1_results.txt`.
 
 ---
 
-### 6. Replaying Task Bags (Task 1B / 1C / 2A / 2B)
+### 7. Replaying Task Bags (Task 1B / 1C / 2A / 2B / 2C)
 To inspect recorded telemetry bags and error profiles:
 
 ```bash
@@ -215,6 +266,9 @@ ros2 bag play task_2a/
 
 # Play Task 2B bag
 ros2 bag play task_2b/
+
+# Play Task 2C bag
+ros2 bag play task_2c/
 
 # Echo recorded position error in a separate terminal
 ros2 topic echo /pos_error
@@ -237,6 +291,7 @@ pico_ws/
 ├── task_1c/                # Task 1C rosbag files and submission zip
 ├── task_2a/                # Task 2A rosbag files and submission C++ controller
 ├── task_2b/                # Task 2B rosbag files and submission C++ nodes
+├── task_2c/                # Task 2C vision/planner nodes, route visualization & rosbag
 └── src/
     ├── swift_pico/         # Core drone package (controllers, bridge, launch files)
     │   ├── launch/         # swift_pico_simulation.launch.py

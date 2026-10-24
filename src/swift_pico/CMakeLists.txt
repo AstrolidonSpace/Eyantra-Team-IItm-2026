@@ -47,7 +47,9 @@ install(
 
 # Looked up at runtime by waypoint_service.py via get_package_share_directory.
 install(
-  FILES src/grid_whycode_coordinates.json
+  FILES
+    src/grid_whycode_coordinates.json
+    src/grid_whycode_coordinates.csv
   DESTINATION share/${PROJECT_NAME}/scripts
 )
 
@@ -107,7 +109,13 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# Install original Python boilerplate scripts
+# Install Python nodes (including waypoint_service alias for ros2 run swift_pico waypoint_service)
+install(
+  PROGRAMS src/waypoint_service.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME waypoint_service
+)
+
 install(
   PROGRAMS
     src/pico_server.py

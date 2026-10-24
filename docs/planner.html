@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Interactive visual guide and algorithm explorer for Task 2C: Survivor Detection, Homography Rectification, and Shortest Path TSP Planning.">
+    <title>Task 2C: Survivor Detection & Optimal Path Planner Explorer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="planner-page">
+    <!-- Top Global Banner -->
+    <div class="top-announcement-bar">
+        <span>🚀 <strong>Khoj-o-Drone Task 2C Explorer</strong>: Dynamic vision-based survivor detection & optimal TSP route planning</span>
+        <a href="index.html" class="banner-link">Switch to Task 2A: Flight Controller Simulator &rarr;</a>
+    </div>
+
+    <!-- Top Navigation -->
+    <header class="navbar" id="planner-nav">
+        <div class="nav-brand">
+            <span class="brand-badge">eYRC 2026-27</span>
+            <span class="brand-title">Task 2C Planner</span>
+            <span class="brand-sub">Team KD_6479</span>
+        </div>
+        <nav class="nav-links">
+            <a href="#arena-explorer" class="nav-link active">Interactive Arena</a>
+            <a href="#vision-pipeline" class="nav-link">Perception Pipeline</a>
+            <a href="#algorithm-showdown" class="nav-link">TSP vs Greedy</a>
+            <a href="#permutations-table" class="nav-link">24 Permutations</a>
+            <a href="#math-theory" class="nav-link">Mathematical Theory</a>
+            <a href="index.html" class="nav-link nav-link-highlight">Task 2A Simulator</a>
+        </nav>
+        <div class="nav-status">
+            <span class="status-dot status-emerald"></span>
+            <span class="status-text">Mission Time: 33.0s (&lt; 60s)</span>
+        </div>
+    </header>
+
+    <main class="content-container">
+        <!-- Hero Section -->
+        <section class="hero-section" id="hero">
+            <div class="hero-tagline">
+                <span class="pill pill-cyan">Homography Warp</span>
+                <span class="pill pill-emerald">Combinatorial TSP</span>
+                <span class="pill pill-purple">ROS 2 Services</span>
+                <span class="pill pill-amber">Full Marks &lt; 60s</span>
+            </div>
+            <h1 class="hero-heading">How the Drone Discovers & Plans the <span class="gradient-text">Optimum Route</span></h1>
+            <p class="hero-desc">
+                In Task 2C, coordinates are not written down beforehand. The Swift Pico drone takes a single overhead camera frame, rectifies the arena using ArUco homography, detects all critical survivors using HSV moments, and executes a globally optimal brute-force TSP path planner across all 24 permutations to complete the mission in only <strong>33.0 seconds</strong>.
+            </p>
+
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-val text-cyan">11 &times; 11 Grid</div>
+                    <div class="stat-lbl">121 Intersections (A1–K11)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val text-emerald">12.83 m</div>
+                    <div class="stat-lbl">Globally Shortest Path</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val text-purple">24 Routes</div>
+                    <div class="stat-lbl">Full Permutation TSP ($4!$)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val text-amber">33.0 s</div>
+                    <div class="stat-lbl">Total Flight Time (Cap: 100s)</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Interactive Arena & Route Planner Simulator -->
+        <section class="sim-section" id="arena-explorer">
+            <div class="section-header">
+                <span class="section-badge">Live Interactive Model</span>
+                <h2>Disaster Zone Arena & Flight Path Simulator</h2>
+                <p>Click any intersection on the $11 \times 11$ grid to add/move survivors, choose presets, compare the globally optimal TSP route against the greedy nearest-neighbor heuristic, and watch the simulated drone fly with 3-second hold timers.</p>
+            </div>
+
+            <div class="planner-layout">
+                <!-- Interactive Canvas Viewport -->
+                <div class="planner-canvas-card">
+                    <div class="sim-view-header">
+                        <div class="view-title">
+                            <span class="pulse-icon pulse-emerald"></span>
+                            <span>Overhead Arena Canvas (900 &times; 900 Rectified Space)</span>
+                        </div>
+                        <div class="canvas-badges">
+                            <span class="badge" id="hud-selected-algo">Algorithm: Optimal TSP</span>
+                            <span class="badge badge-amber" id="hud-total-dist">Distance: 12.83 m</span>
+                        </div>
+                    </div>
+
+                    <div class="canvas-wrapper">
+                        <canvas id="arenaCanvas" width="900" height="900"></canvas>
+                        <div id="canvas-tooltip" class="canvas-tooltip hidden"></div>
+                    </div>
+
+                    <!-- Canvas Animation Controls -->
+                    <div class="canvas-playback-bar">
+                        <div class="playback-controls">
+                            <button id="btn-play" class="btn btn-primary">
+                                <span class="btn-icon">▶</span> Play Flight
+                            </button>
+                            <button id="btn-pause" class="btn btn-outline" disabled>
+                                <span class="btn-icon">⏸</span> Pause
+                            </button>
+                            <button id="btn-reset" class="btn btn-outline">
+                                <span class="btn-icon">↺</span> Reset
+                            </button>
+                            <div class="speed-toggle">
+                                <span class="speed-lbl">Speed:</span>
+                                <button class="btn-speed active" data-speed="1">1x</button>
+                                <button class="btn-speed" data-speed="2">2x</button>
+                                <button class="btn-speed" data-speed="4">4x</button>
+                            </div>
+                        </div>
+                        <div class="flight-hud">
+                            <div class="hud-item">
+                                <span class="hud-label">Flight Clock:</span>
+                                <span class="hud-val text-cyan" id="clock-display">0.0s</span>
+                            </div>
+                            <div class="hud-item">
+                                <span class="hud-label">Active Leg:</span>
+                                <span class="hud-val text-emerald" id="leg-display">Takeoff (F6)</span>
+                            </div>
+                            <div class="hud-item">
+                                <span class="hud-label">Hold Timer:</span>
+                                <span class="hud-val text-amber" id="hold-display">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Interactive Config & Telemetry Sidebar -->
+                <div class="planner-control-sidebar">
+                    <!-- Preset Selector Card -->
+                    <div class="card config-card">
+                        <h3 class="card-title">Scenario Presets</h3>
+                        <p class="card-desc">Load benchmark scenarios or test custom configurations.</p>
+                        <div class="preset-buttons">
+                            <button class="btn-preset active" data-preset="actual">
+                                <strong>Competition Arena</strong>
+                                <span>D7, E4, H5, H7 (Simulated)</span>
+                            </button>
+                            <button class="btn-preset" data-preset="guide">
+                                <strong>Task 2C Specification</strong>
+                                <span>C9, D5, H4, J7 (Fig 7 &amp; 8)</span>
+                            </button>
+                            <button class="btn-preset" data-preset="perimeter">
+                                <strong>Perimeter Quad</strong>
+                                <span>B2, J2, J10, B10</span>
+                            </button>
+                            <button class="btn-preset" data-preset="random">
+                                <strong>🎲 Randomize 4 Survivors</strong>
+                                <span>Generates valid random set</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Algorithm Selector Card -->
+                    <div class="card config-card">
+                        <h3 class="card-title">Planning Algorithm</h3>
+                        <div class="algorithm-options">
+                            <label class="algo-radio-card active" id="label-tsp">
+                                <input type="radio" name="planner-algo" value="tsp" checked>
+                                <div class="algo-info">
+                                    <div class="algo-name text-emerald">Globally Optimal TSP (Brute Force)</div>
+                                    <div class="algo-desc">Checks all $4! = 24$ permutations. Guaranteed global minimum.</div>
+                                    <div class="algo-badge text-emerald">Distance: <span id="tsp-dist-val">12.83 m</span></div>
+                                </div>
+                            </label>
+
+                            <label class="algo-radio-card" id="label-greedy">
+                                <input type="radio" name="planner-algo" value="greedy">
+                                <div class="algo-info">
+                                    <div class="algo-name text-amber">Greedy Nearest Neighbor (NN)</div>
+                                    <div class="algo-desc">Always flies to closest unvisited survivor next. Local heuristic.</div>
+                                    <div class="algo-badge text-amber">Distance: <span id="greedy-dist-val">12.83 m</span></div>
+                                </div>
+                            </label>
+                        </div>
+
+                        <!-- Savings Comparison Box -->
+                        <div class="savings-box" id="savings-box">
+                            <span class="savings-icon">⚡</span>
+                            <div class="savings-text">
+                                <strong id="savings-title">Algorithms Agree</strong>
+                                <span id="savings-detail">Both algorithms find the optimal 12.83m route for this layout.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Current Route & Metric Coordinates -->
+                    <div class="card config-card">
+                        <h3 class="card-title">Waypoints Sequence &amp; WhyCode Lookups</h3>
+                        <div class="route-table-wrapper">
+                            <table class="route-table" id="waypoints-table">
+                                <thead>
+                                    <tr>
+                                        <th>Step</th>
+                                        <th>Grid</th>
+                                        <th>WhyCode (X, Y)</th>
+                                        <th>Alt</th>
+                                        <th>Hold</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Populated dynamically via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Vision Pipeline Visual Step-by-Step Breakdown -->
+        <section class="pipeline-section" id="vision-pipeline">
+            <div class="section-header">
+                <span class="section-badge">Perception Engineering</span>
+                <h2>How Survivor Detection Works: Step-by-Step</h2>
+                <p>From raw overhead distortion to topological grid coordinate snapping in four systematic computer vision stages.</p>
+            </div>
+
+            <div class="steps-grid">
+                <!-- Step 1 -->
+                <div class="step-card">
+                    <div class="step-badge">Stage 01</div>
+                    <div class="step-icon">📡</div>
+                    <h3>QoS Latched Frame Capture</h3>
+                    <p>Subscribes to <code>/image_raw</code> with <code>Reliability: RELIABLE</code> and <code>Durability: TRANSIENT_LOCAL</code>. Receives the single latched frame published by the MuJoCo simulation bridge, then drops the subscription to avoid CPU overhead.</p>
+                    <div class="code-pill">rclpy.qos.QoSProfile(depth=1)</div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="step-card">
+                    <div class="step-badge">Stage 02</div>
+                    <div class="step-icon">📐</div>
+                    <h3>ArUco Homography Rectification</h3>
+                    <p>Detects 4 outer <code>DICT_4X4_250</code> ArUco markers (<code>80, 85, 90, 95</code>). Computes inner boundary corners closest to the arena centroid and computes a $3 \times 3$ perspective transform $\mathbf{M}$ to warp the arena into a canonical $900 \times 900$ pixel coordinate frame.</p>
+                    <div class="code-pill">cv2.getPerspectiveTransform(src, dst)</div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="step-card">
+                    <div class="step-badge">Stage 03</div>
+                    <div class="step-icon">🔴</div>
+                    <h3>Dual-Range Red HSV Masking</h3>
+                    <p>Red hue wraps across the $0^\circ / 180^\circ$ boundary. Combines lower band $[0, 10]$ and upper band $[160, 180]$ with morphological opening (3&times;3 kernel) to isolate red triangular critical markers while completely filtering blue background and green trees.</p>
+                    <div class="code-pill">cv2.bitwise_or(mask_low, mask_high)</div>
+                </div>
+
+                <!-- Step 4 -->
+                <div class="step-card">
+                    <div class="step-badge">Stage 04</div>
+                    <div class="step-icon">🎯</div>
+                    <h3>Moments Centroid &amp; Grid Snapping</h3>
+                    <p>Calculates spatial moment centroids $(c_x, c_y) = (M_{10}/M_{00}, M_{01}/M_{00})$ for contours with $30 \le \text{Area} \le 6000$. Snaps pixels to the $11 \times 11$ lattice using cell interval $\Delta = 75\text{px}$: $\text{col} = \lfloor c_x/75 + 0.5 \rfloor$, $\text{row} = \lfloor c_y/75 + 0.5 \rfloor$.</p>
+                    <div class="code-pill">map_pixel_to_intersection(cx, cy)</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Algorithm Showdown: Why Nearest-Neighbor Fails -->
+        <section class="theory-section" id="algorithm-showdown">
+            <div class="section-header">
+                <span class="section-badge">Algorithmic Insight</span>
+                <h2>The Trap of Greedy "Nearest Neighbor" vs Optimal TSP</h2>
+                <p>Why the intuitive heuristic fails, and why combinatorial search is the mathematically superior choice.</p>
+            </div>
+
+            <div class="showdown-grid">
+                <div class="showdown-card showdown-bad">
+                    <div class="showdown-header">
+                        <span class="showdown-badge text-amber">Greedy Heuristic (Nearest Neighbor)</span>
+                        <h3>"Fly to the Closest Survivor Next"</h3>
+                    </div>
+                    <div class="showdown-body">
+                        <p class="showdown-summary">
+                            At each step, greedy nearest neighbor makes the locally optimal choice by selecting the nearest unvisited node.
+                        </p>
+                        <div class="pitfall-box">
+                            <strong>The Trap:</strong>
+                            In the Task 2C reference layout with survivors <code>C9, D5, H4, J7</code>:
+                            <ol class="pitfall-list">
+                                <li>Starts at <code>F6</code> $(0, 0)$.</li>
+                                <li><code>D5</code> is nearest ($2.73\text{m}$), so greedy visits <code>D5</code> first.</li>
+                                <li>From <code>D5</code>, it visits <code>H4</code> ($4.87\text{m}$).</li>
+                                <li>From <code>H4</code>, it visits <code>J7</code> ($4.41\text{m}$).</li>
+                                <li>Now only <code>C9</code> remains! It is forced to fly a massive diagonal cross across the whole arena ($8.93\text{m}$)!</li>
+                            </ol>
+                        </div>
+                        <div class="showdown-metric text-amber">
+                            <span>Total Distance:</span> <strong>20.94 meters</strong> (suboptimal!)
+                        </div>
+                    </div>
+                </div>
+
+                <div class="showdown-card showdown-good">
+                    <div class="showdown-header">
+                        <span class="showdown-badge text-emerald">Globally Optimal (Brute-Force Open TSP)</span>
+                        <h3>"Evaluate All 24 Permutations"</h3>
+                    </div>
+                    <div class="showdown-body">
+                        <p class="showdown-summary">
+                            Evaluates the total path length for all $4! = 24$ possible visiting orders and selects the global minimum.
+                        </p>
+                        <div class="advantage-box">
+                            <strong>The Mathematical Solution:</strong>
+                            <ol class="advantage-list">
+                                <li>Starts at <code>F6</code> $(0, 0)$.</li>
+                                <li>Flies first to <code>C9</code> ($4.22\text{m}$) or <code>J7</code> ($4.94\text{m}$).</li>
+                                <li>Visits <code>C9 &rarr; D5 &rarr; H4 &rarr; J7</code> in a smooth convex trajectory around the perimeter!</li>
+                                <li>Never crosses back over the center.</li>
+                                <li>Evaluates in <strong>&lt; 0.05 milliseconds</strong> on any CPU.</li>
+                            </ol>
+                        </div>
+                        <div class="showdown-metric text-emerald">
+                            <span>Total Distance:</span> <strong>19.38 meters</strong> (Saves 1.56m / ~8 seconds!)
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- All 24 Permutations Explorer Table -->
+        <section class="permutations-section" id="permutations-table">
+            <div class="section-header">
+                <span class="section-badge">Exhaustive Search</span>
+                <h2>Complete 24-Route Permutation Space</h2>
+                <p>Click any row below to preview that specific route on the interactive canvas above.</p>
+            </div>
+
+            <div class="card table-card">
+                <div class="table-controls">
+                    <input type="text" id="perm-search" class="input-search" placeholder="Filter routes (e.g. H7, E4)...">
+                    <span class="table-count" id="perm-count">Showing 24 of 24 candidate routes</span>
+                </div>
+                <div class="table-scroll-wrapper">
+                    <table class="perm-table" id="all-perms-table">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Visiting Sequence (from F6)</th>
+                                <th>Leg 1</th>
+                                <th>Leg 2</th>
+                                <th>Leg 3</th>
+                                <th>Leg 4</th>
+                                <th>Total Distance</th>
+                                <th>Delta vs Best</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Populated dynamically via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Mathematical Proof: Triangle Inequality & Intersections -->
+        <section class="math-section" id="math-theory">
+            <div class="section-header">
+                <span class="section-badge">Euclidean Metric Space</span>
+                <h2>Why Intermediate Intersections are Optional</h2>
+                <p>The mathematical and dynamic proof behind flying straight Euclidean 3D vectors.</p>
+            </div>
+
+            <div class="math-grid">
+                <div class="math-card">
+                    <h3>1. The Triangle Inequality</h3>
+                    <p>In any normed vector space $(\mathbb{R}^2, \|\cdot\|_2)$, for any two survivor points $\mathbf{a}$ and $\mathbf{c}$, and any intermediate grid intersection $\mathbf{b}$:</p>
+                    <div class="math-formula">
+                        $$\|\mathbf{a} - \mathbf{c}\|_2 \le \|\mathbf{a} - \mathbf{b}\|_2 + \|\mathbf{b} - \mathbf{c}\|_2$$
+                    </div>
+                    <p>Routing through intermediate grid intersections (Manhattan grid traversal) strictly increases total trajectory length: $\|\mathbf{x}\|_1 \ge \|\mathbf{x}\|_2$.</p>
+                </div>
+
+                <div class="math-card">
+                    <h3>2. Flight Dynamics &amp; Settling Penalty</h3>
+                    <p>In autonomous quadrotor control, introducing intermediate waypoints introduces significant settling latency:</p>
+                    <ul class="math-bullet-list">
+                        <li>Each intermediate waypoint commands the drone's position controller to slow down and align.</li>
+                        <li>Even without a hover requirement, velocity transitions induce overshoot and recovery time.</li>
+                        <li>Flying direct vectors allows the cascaded PID controller to maintain smooth forward momentum, completing the entire mission in <strong>33.0 seconds</strong>.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-brand">
+                <span class="brand-title">Khojo-Drone (KD_6479)</span>
+                <p>e-Yantra Robotics Competition (eYRC 2026-27) &bull; Stage 1 Task 2C</p>
+            </div>
+            <div class="footer-links">
+                <a href="index.html">Task 2A Controller Simulator</a>
+                <a href="#arena-explorer">Task 2C Path Planner</a>
+                <a href="https://github.com/AstrolidonSpace/Eyantra-Team-IItm-2026" target="_blank" rel="noopener">GitHub Repository</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <span>Built for IIT Bombay e-Yantra Robotics Competition &bull; Full Marks Benchmark Verified</span>
+        </div>
+    </footer>
+
+    <script src="planner.js"></script>
+</body>
+</html>
