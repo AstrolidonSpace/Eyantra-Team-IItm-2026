@@ -47,9 +47,9 @@ public:
         actual_vel_y = 0.0f;
         actual_vel_z = 0.0f;
 
-        // Default setpoint to wp1
-        setpoint[0] = -2.41f;
-        setpoint[1] = -2.41f;
+        // Default setpoint to arena center F6 (Task 2C starting position)
+        setpoint[0] = 0.01f;
+        setpoint[1] = 0.01f;
         setpoint[2] = 13.0f;
 
         current_dtime = 0.0;

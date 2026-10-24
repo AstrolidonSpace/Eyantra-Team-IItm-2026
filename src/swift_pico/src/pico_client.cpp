@@ -65,9 +65,12 @@ public:
     void send_goal(const std::vector<double> & waypoint)
     {
         RCLCPP_INFO(this->get_logger(), "Waiting for action server...");
-        if (!action_client_->wait_for_action_server(10s)) {
-            RCLCPP_ERROR(this->get_logger(), "Action server not available after waiting");
-            return;
+        while (!action_client_->wait_for_action_server(1s)) {
+            if (!rclcpp::ok()) {
+                RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for action server. Exiting.");
+                return;
+            }
+            RCLCPP_INFO(this->get_logger(), "Action server not available, waiting again...");
         }
 
         auto goal_msg = NavToWaypoint::Goal();

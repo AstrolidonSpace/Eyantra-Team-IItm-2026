@@ -12,15 +12,15 @@ class WaypointServiceNode : public rclcpp::Node
 public:
     WaypointServiceNode() : Node("waypoints_service")
     {
-        // Define the 4 waypoints in exact sequence: wp1 to wp4
+        // Task 2C Optimal Route for Critical Survivors: H7 -> H5 -> E4 -> D7
         waypoints_ = {
-            {-2.41, -2.41, 13.00},
-            { 2.41,  1.20, 13.00},
-            { 1.20, -2.41, 13.00},
-            {-1.20,  1.20, 13.00}
+            {-2.42, -1.21, 13.00}, // H7
+            {-2.43,  1.22, 13.00}, // H5
+            { 1.22,  2.44, 13.00}, // E4
+            { 2.44, -1.21, 13.00}  // D7
         };
 
-        marker_ids_ = {"wp1", "wp2", "wp3", "wp4"};
+        marker_ids_ = {"H7", "H5", "E4", "D7"};
 
         service_ = this->create_service<waypoint_navigation::srv::GetWaypoints>(
             "waypoints",
