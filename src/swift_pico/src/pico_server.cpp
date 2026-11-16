@@ -37,23 +37,25 @@ public:
     {
         drone_position[0] = 0.0f;
         drone_position[1] = 0.0f;
-        drone_position[2] = 13.0f;
+        drone_position[2] = 15.0f; // Ground level before takeoff
 
         prev_drone_position[0] = 0.0f;
         prev_drone_position[1] = 0.0f;
-        prev_drone_position[2] = 13.0f;
+        prev_drone_position[2] = 15.0f;
 
         actual_vel_x = 0.0f;
         actual_vel_y = 0.0f;
         actual_vel_z = 0.0f;
 
-        // Default setpoint to arena center F6 (Task 2C starting position)
-        setpoint[0] = 0.01f;
-        setpoint[1] = 0.01f;
+        // Default setpoint to arena center F6
+        setpoint[0] = 0.0067f;
+        setpoint[1] = 0.0068f;
         setpoint[2] = 13.0f;
 
         current_dtime = 0.0;
+        last_marker_received_time = 0.0;
         first_marker_received = false;
+        is_disarmed_ = false;
 
         cmd.rc_roll = 1500;
         cmd.rc_pitch = 1500;
@@ -69,8 +71,8 @@ public:
         prev_error[0] = 0.0f;    prev_error[1] = 0.0f;
 
         Kp_vel[0] = 25.0f; Kp_vel[1] = 25.0f;
-        Ki_vel[0] = 0.0f;  Ki_vel[0] = 0.0f;
-        Kd_vel[0] = 0.0f;  Kd_vel[0] = 0.0f;
+        Ki_vel[0] = 0.0f;  Ki_vel[1] = 0.0f;
+        Kd_vel[0] = 0.0f;  Kd_vel[1] = 0.0f;
         vel_error_sum[0] = 0.0f; vel_error_sum[1] = 0.0f;
         prev_vel_error[0] = 0.0f; prev_vel_error[1] = 0.0f;
 
@@ -87,7 +89,7 @@ public:
         vel_z_error_sum = 0.0f;
         prev_vel_z_error = 0.0f;
 
-        max_horizontal_vel = 1.5f;
+        max_horizontal_vel = 1.7f;
         max_vertical_vel = 5.0f;
         windup_guard = 40.0f;
 
@@ -115,7 +117,7 @@ public:
             std::bind(&WayPointServer::whycode_callback, this, _1),
             sub_opt);
 
-        // Action Server
+        // Action Server (with cancel support enabled)
         action_server_ = rclcpp_action::create_server<NavToWaypoint>(
             this,
             "waypoint_navigation",
@@ -133,53 +135,55 @@ public:
         pid_timer_ = this->create_wall_timer(
             sample_time, std::bind(&WayPointServer::pid, this), pid_callback_group_);
 
-        RCLCPP_INFO(this->get_logger(), "WayPointServer C++ node initialized and armed");
+        RCLCPP_INFO(this->get_logger(), "WayPointServer C++ node initialized and armed for Task 3A");
     }
 
 private:
-    float drone_position[3];
-    float prev_drone_position[3];
-    float actual_vel_x;
-    float actual_vel_y;
-    float actual_vel_z;
-    float setpoint[3];
-    double current_dtime;
-    bool first_marker_received;
+    float drone_position[3] = {0.0f, 0.0f, 15.0f};
+    float prev_drone_position[3] = {0.0f, 0.0f, 15.0f};
+    float actual_vel_x = 0.0f;
+    float actual_vel_y = 0.0f;
+    float actual_vel_z = 0.0f;
+    float setpoint[3] = {0.0f, 0.0f, 13.0f};
+    double current_dtime = 0.0;
+    double last_marker_received_time = 0.0;
+    bool first_marker_received = false;
+    bool is_disarmed_ = false;
 
-    CMD cmd;
-    std::chrono::milliseconds sample_time;
-    float dt;
+    CMD cmd{};
+    std::chrono::milliseconds sample_time{33ms};
+    float dt{0.033f};
 
     // Roll (0) and Pitch (1) cascaded PID parameters
-    float Kp_pos[2];
-    float Ki_pos[2];
-    float Kd_pos[2];
-    float pos_error_sum[2];
-    float prev_error[3];
-    float max_horizontal_vel;
+    float Kp_pos[2] = {66.0f, 66.0f};
+    float Ki_pos[2] = {0.016f, 0.016f};
+    float Kd_pos[2] = {90.0f, 90.0f};
+    float pos_error_sum[2] = {0.0f, 0.0f};
+    float prev_error[3] = {0.0f, 0.0f, 0.0f};
+    float max_horizontal_vel = 2.4f;
 
-    float Kp_vel[2];
-    float Ki_vel[2];
-    float Kd_vel[2];
-    float vel_error_sum[2];
-    float prev_vel_error[2];
+    float Kp_vel[2] = {25.0f, 25.0f};
+    float Ki_vel[2] = {0.0f, 0.0f};
+    float Kd_vel[2] = {0.0f, 0.0f};
+    float vel_error_sum[2] = {0.0f, 0.0f};
+    float prev_vel_error[2] = {0.0f, 0.0f};
 
     // Altitude cascaded PID parameters
-    float Kp_pos_z;
-    float Ki_pos_z;
-    float Kd_pos_z;
-    float pos_z_error_sum;
-    float max_vertical_vel;
+    float Kp_pos_z = 3.0f;
+    float Ki_pos_z = 0.045f;
+    float Kd_pos_z = 2.2f;
+    float pos_z_error_sum = 0.0f;
+    float max_vertical_vel = 5.0f;
 
-    float Kp_vel_z;
-    float Ki_vel_z;
-    float Kd_vel_z;
-    float vel_z_error_sum;
-    float prev_vel_z_error;
+    float Kp_vel_z = 22.0f;
+    float Ki_vel_z = 2.0f;
+    float Kd_vel_z = 0.0f;
+    float vel_z_error_sum = 0.0f;
+    float prev_vel_z_error = 0.0f;
 
-    float windup_guard;
-    int min_values[3];
-    int max_values[3];
+    float windup_guard = 40.0f;
+    int min_values[3] = {1000, 1000, 1000};
+    int max_values[3] = {2000, 2000, 2000};
 
     std::mutex mutex_;
 
@@ -205,18 +209,20 @@ private:
 
     void disarm()
     {
+        is_disarmed_ = true;
         auto msg = swift_msgs::msg::SwiftMsgs();
-        msg.rc_roll = 1000;
-        msg.rc_pitch = 1000;
-        msg.rc_yaw = 1000;
+        msg.rc_roll = 1500;
+        msg.rc_pitch = 1500;
+        msg.rc_yaw = 1500;
         msg.rc_throttle = 1000;
         msg.rc_aux4 = 1000;
         command_pub_->publish(msg);
+        RCLCPP_INFO(this->get_logger(), "Drone DISARMED on ground.");
     }
 
     void arm()
     {
-        disarm();
+        is_disarmed_ = false;
         auto msg = swift_msgs::msg::SwiftMsgs();
         msg.rc_roll = 1500;
         msg.rc_pitch = 1500;
@@ -224,6 +230,7 @@ private:
         msg.rc_throttle = 1500;
         msg.rc_aux4 = 2000;
         command_pub_->publish(msg);
+        RCLCPP_INFO(this->get_logger(), "Drone ARMED.");
     }
 
     void whycode_callback(const whycode_interfaces::msg::MarkerArray & msg)
@@ -243,12 +250,13 @@ private:
 
             current_dtime = static_cast<double>(msg.header.stamp.sec) +
                             static_cast<double>(msg.header.stamp.nanosec) * 1e-9;
+            last_marker_received_time = current_dtime;
         }
     }
 
     void pid()
     {
-        if (!first_marker_received) {
+        if (!first_marker_received || is_disarmed_) {
             return;
         }
 
@@ -289,27 +297,35 @@ private:
 
         float actual_vel_lat[2] = { actual_vel_y, actual_vel_x };
 
-        float out[2] = {0.0f, 0.0f};
+        float raw_desired_vel[2];
         for (int i = 0; i < 2; i++)
         {
-            // Conditional integration anti-windup: only integrate near setpoint
-            if (std::abs(error[i]) < 0.6f) {
-                pos_error_sum[i] += error[i] * dt;
-                pos_error_sum[i] = std::clamp(pos_error_sum[i], -windup_guard, windup_guard);
-            } else {
-                pos_error_sum[i] = 0.0f;
-            }
+            pos_error_sum[i] += error[i] * dt;
+            pos_error_sum[i] = std::clamp(pos_error_sum[i], -windup_guard, windup_guard);
 
             float pos_derivative = (error[i] - prev_error[i]) / dt;
             prev_error[i] = error[i];
 
-            float desired_vel = (Kp_pos[i] * error[i]) + 
-                                (Ki_pos[i] * pos_error_sum[i]) + 
-                                (Kd_pos[i] * pos_derivative);
+            raw_desired_vel[i] = (Kp_pos[i] * error[i]) + 
+                                 (Ki_pos[i] * pos_error_sum[i]) + 
+                                 (Kd_pos[i] * pos_derivative);
+        }
 
-            desired_vel = std::clamp(desired_vel, -max_horizontal_vel, max_horizontal_vel);
+        float horiz_speed = std::hypot(raw_desired_vel[0], raw_desired_vel[1]);
+        float desired_vel[2];
+        if (horiz_speed > max_horizontal_vel) {
+            float scale = max_horizontal_vel / horiz_speed;
+            desired_vel[0] = raw_desired_vel[0] * scale;
+            desired_vel[1] = raw_desired_vel[1] * scale;
+        } else {
+            desired_vel[0] = raw_desired_vel[0];
+            desired_vel[1] = raw_desired_vel[1];
+        }
 
-            float vel_error = desired_vel - actual_vel_lat[i];
+        float out[2] = {0.0f, 0.0f};
+        for (int i = 0; i < 2; i++)
+        {
+            float vel_error = desired_vel[i] - actual_vel_lat[i];
             vel_error_sum[i] += vel_error * dt;
             vel_error_sum[i] = std::clamp(vel_error_sum[i], -windup_guard, windup_guard);
 
@@ -361,7 +377,7 @@ private:
         cmd_msg.rc_roll     = std::clamp(target_roll, min_values[0], max_values[0]);
         cmd_msg.rc_pitch    = std::clamp(target_pitch, min_values[1], max_values[1]);
         cmd_msg.rc_throttle = std::clamp(target_throttle, min_values[2], max_values[2]);
-        cmd_msg.rc_yaw      = 1500; // Hold yaw_rate = 0.0 rigidly in simulator
+        cmd_msg.rc_yaw      = 1500;
         cmd_msg.rc_aux4     = 2000;
 
         command_pub_->publish(cmd_msg);
@@ -373,7 +389,9 @@ private:
     {
         (void)uuid;
         (void)goal;
-        RCLCPP_INFO(this->get_logger(), "Received goal request");
+        RCLCPP_INFO(this->get_logger(), "Received goal request: [%.2f, %.2f, %.2f] hover=%s",
+                    goal->waypoint.position.x, goal->waypoint.position.y, goal->waypoint.position.z,
+                    goal->hover ? "true" : "false");
         return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
     }
 
@@ -381,119 +399,334 @@ private:
         const std::shared_ptr<GoalHandleNav> goal_handle)
     {
         (void)goal_handle;
-        RCLCPP_INFO(this->get_logger(), "Received request to cancel goal");
+        RCLCPP_INFO(this->get_logger(), "Received request to cancel active goal. Accepting cancel.");
         return rclcpp_action::CancelResponse::ACCEPT;
     }
 
     void handle_accepted(const std::shared_ptr<GoalHandleNav> goal_handle)
     {
-        // Execute in a separate detached worker thread
         std::thread{std::bind(&WayPointServer::execute, this, _1), goal_handle}.detach();
     }
 
     void execute(const std::shared_ptr<GoalHandleNav> goal_handle)
     {
-        RCLCPP_INFO(this->get_logger(), "Executing goal...");
+        if (is_disarmed_) {
+            arm();
+            std::this_thread::sleep_for(100ms);
+        }
+
         const auto goal = goal_handle->get_goal();
+        float target_x = static_cast<float>(goal->waypoint.position.x);
+        float target_y = static_cast<float>(goal->waypoint.position.y);
+        bool should_hover = goal->hover;
+
+        bool is_f6 = (std::hypot(target_x, target_y) < 0.25f);
 
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            setpoint[0] = static_cast<float>(goal->waypoint.position.x);
-            setpoint[1] = static_cast<float>(goal->waypoint.position.y);
-            setpoint[2] = static_cast<float>(goal->waypoint.position.z);
+            setpoint[0] = target_x;
+            setpoint[1] = target_y;
+            setpoint[2] = 13.0f; // Cruise altitude
 
-            // Reset loop integrals and errors on new waypoint transition
-            pos_error_sum[0] = 0.0f; pos_error_sum[1] = 0.0f;
-            vel_error_sum[0] = 0.0f; vel_error_sum[1] = 0.0f;
+            // Update prev_error to prevent derivative kick from setpoint step change
             prev_error[0] = setpoint[1] - drone_position[1];
             prev_error[1] = setpoint[0] - drone_position[0];
-            prev_vel_error[0] = 0.0f; prev_vel_error[1] = 0.0f;
-
-            pos_z_error_sum = 0.0f;
-            vel_z_error_sum = 0.0f;
             prev_error[2] = setpoint[2] - drone_position[2];
-            prev_vel_z_error = 0.0f;
         }
 
-        RCLCPP_INFO(this->get_logger(), "New Waypoint Set: [%.2f, %.2f, %.2f]",
-            goal->waypoint.position.x, goal->waypoint.position.y, goal->waypoint.position.z);
+        RCLCPP_INFO(this->get_logger(), "Executing Goal -> Target: [%.2f, %.2f, 13.00], hover=%s, is_f6=%s",
+                    target_x, target_y, should_hover ? "true" : "false", is_f6 ? "true" : "false");
 
         auto feedback = std::make_shared<NavToWaypoint::Feedback>();
         auto result = std::make_shared<NavToWaypoint::Result>();
 
-        double start_time;
-        {
-            std::lock_guard<std::mutex> lock(mutex_);
-            start_time = current_dtime;
+        rclcpp::Rate loop_rate(20); // 50 ms loop
+        const double loop_dt = 0.05;
+
+        // =========================================================================
+        // CASE 1: Intermediate navigation waypoint (!should_hover)
+        // Fly past at Z = 13 without stopping!
+        // =========================================================================
+        if (!should_hover) {
+            while (rclcpp::ok()) {
+                if (goal_handle->is_canceling()) {
+                    float cur_x, cur_y;
+                    {
+                        std::lock_guard<std::mutex> lock(mutex_);
+                        cur_x = drone_position[0];
+                        cur_y = drone_position[1];
+                        setpoint[0] = cur_x;
+                        setpoint[1] = cur_y;
+                        setpoint[2] = 13.0f;
+                    }
+                    goal_handle->canceled(result);
+                    RCLCPP_INFO(this->get_logger(), "Pass-through goal canceled mid-flight. Holding at [%.2f, %.2f, 13.00]",
+                                cur_x, cur_y);
+                    return;
+                }
+
+                float cur_x, cur_y, cur_z;
+                {
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    cur_x = drone_position[0];
+                    cur_y = drone_position[1];
+                    cur_z = drone_position[2];
+                }
+
+                feedback->current_waypoint.pose.position.x = cur_x;
+                feedback->current_waypoint.pose.position.y = cur_y;
+                feedback->current_waypoint.pose.position.z = cur_z;
+                feedback->current_waypoint.header.stamp.sec = 0;
+                goal_handle->publish_feedback(feedback);
+
+                float d_xy = std::hypot(cur_x - target_x, cur_y - target_y);
+                float d_z = std::abs(cur_z - 13.0f);
+                if (d_xy <= 0.55f && d_z <= 0.55f) {
+                    RCLCPP_INFO(this->get_logger(), "Passed navigation waypoint [%.2f, %.2f] (d=%.2fm) without stopping.", target_x, target_y, d_xy);
+                    result->hov_time = 0;
+                    goal_handle->succeed(result);
+                    return;
+                }
+                loop_rate.sleep();
+            }
         }
 
-        double point_in_sphere_start_time = -1.0;
-        double time_inside_sphere = 0.0;
-        double max_time_inside_sphere = 0.0;
+        // =========================================================================
+        // CASE 2: Home at F6 (Hover at Z=13 for 1s, then descend and land!)
+        // =========================================================================
+        if (is_f6) {
+            RCLCPP_INFO(this->get_logger(), "Arrived at F6: Initiating 1s hover at Z=13, then landing...");
+            double f6_hover_time = 0.0;
 
-        rclcpp::Rate loop_rate(20);
+            while (rclcpp::ok()) {
+                if (goal_handle->is_canceling()) {
+                    float cur_x, cur_y;
+                    {
+                        std::lock_guard<std::mutex> lock(mutex_);
+                        cur_x = drone_position[0];
+                        cur_y = drone_position[1];
+                        setpoint[0] = cur_x;
+                        setpoint[1] = cur_y;
+                        setpoint[2] = 13.0f;
+                    }
+                    goal_handle->canceled(result);
+                    return;
+                }
 
+                float cur_x, cur_y, cur_z;
+                double now_time;
+                {
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    cur_x = drone_position[0];
+                    cur_y = drone_position[1];
+                    cur_z = drone_position[2];
+                    now_time = current_dtime;
+                }
+
+                feedback->current_waypoint.pose.position.x = cur_x;
+                feedback->current_waypoint.pose.position.y = cur_y;
+                feedback->current_waypoint.pose.position.z = cur_z;
+                feedback->current_waypoint.header.stamp.sec = static_cast<int>(f6_hover_time);
+                goal_handle->publish_feedback(feedback);
+
+                float d_sphere = std::sqrt(
+                    (cur_x - target_x) * (cur_x - target_x) +
+                    (cur_y - target_y) * (cur_y - target_y) +
+                    (cur_z - 13.0f) * (cur_z - 13.0f)
+                );
+
+                bool marker_valid = (now_time - last_marker_received_time < 0.3);
+                if (d_sphere <= 0.40f && marker_valid) {
+                    f6_hover_time += loop_dt;
+                } else {
+                    f6_hover_time = 0.0;
+                }
+
+                if (f6_hover_time >= 1.0) {
+                    RCLCPP_INFO(this->get_logger(), "F6 Hover (1s at Z=13) complete! Descending to land...");
+                    break;
+                }
+                loop_rate.sleep();
+            }
+
+            // Descend slowly from Z=13.0 to ground Z=15.2
+            float landing_sp_z = 13.0f;
+            while (rclcpp::ok()) {
+                landing_sp_z = std::min(15.2f, landing_sp_z + 0.06f); // Ramp altitude down
+                {
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    setpoint[2] = landing_sp_z;
+                }
+
+                float cur_z;
+                {
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    cur_z = drone_position[2];
+                }
+
+                feedback->current_waypoint.pose.position.z = cur_z;
+                goal_handle->publish_feedback(feedback);
+
+                if (cur_z >= 14.85f && landing_sp_z >= 15.1f) {
+                    RCLCPP_INFO(this->get_logger(), "Drone touched ground at Z=%.2f. Settling...", cur_z);
+                    std::this_thread::sleep_for(500ms);
+                    disarm();
+                    result->hov_time = 1;
+                    goal_handle->succeed(result);
+                    RCLCPP_INFO(this->get_logger(), "LANDED AT F6 SUCCESSFULLY! Mission Goal Complete.");
+                    return;
+                }
+                loop_rate.sleep();
+            }
+        }
+
+        // =========================================================================
+        // CASE 3: Survivor Saving Maneuver (Visit 1s @ Z=13, Save 2s @ Z=14)
+        // =========================================================================
+        RCLCPP_INFO(this->get_logger(), "Starting Saving Maneuver: Stage 1 (Visit @ Z=13, 1s)...");
+
+        // Stage 1: Visit (Z = 13, 1 second inside sphere r = 0.4)
+        double visit_hold_time = 0.0;
         while (rclcpp::ok()) {
             if (goal_handle->is_canceling()) {
+                float cur_x, cur_y;
+                {
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    cur_x = drone_position[0];
+                    cur_y = drone_position[1];
+                    setpoint[0] = cur_x;
+                    setpoint[1] = cur_y;
+                    setpoint[2] = 13.0f;
+                }
                 goal_handle->canceled(result);
-                RCLCPP_INFO(this->get_logger(), "Goal canceled");
+                RCLCPP_INFO(this->get_logger(), "Goal canceled during Stage 1 Visit. Holding at [%.2f, %.2f, 13.00]",
+                            cur_x, cur_y);
                 return;
             }
 
             float cur_x, cur_y, cur_z;
-            float target_x, target_y, target_z;
-            double now_dtime;
+            double now_time;
             {
                 std::lock_guard<std::mutex> lock(mutex_);
                 cur_x = drone_position[0];
                 cur_y = drone_position[1];
                 cur_z = drone_position[2];
-                target_x = setpoint[0];
-                target_y = setpoint[1];
-                target_z = setpoint[2];
-                now_dtime = current_dtime;
+                now_time = current_dtime;
             }
 
             feedback->current_waypoint.pose.position.x = cur_x;
             feedback->current_waypoint.pose.position.y = cur_y;
             feedback->current_waypoint.pose.position.z = cur_z;
-            feedback->current_waypoint.header.stamp.sec = static_cast<int>(time_inside_sphere);
-
+            feedback->current_waypoint.header.stamp.sec = static_cast<int>(visit_hold_time);
             goal_handle->publish_feedback(feedback);
 
-            // Hold within ±0.4 whycode units on all 3 axes
-            bool inside = (std::abs(cur_x - target_x) <= 0.4f) &&
-                          (std::abs(cur_y - target_y) <= 0.4f) &&
-                          (std::abs(cur_z - target_z) <= 0.4f);
+            float d_sphere = std::sqrt(
+                (cur_x - target_x) * (cur_x - target_x) +
+                (cur_y - target_y) * (cur_y - target_y) +
+                (cur_z - 13.0f) * (cur_z - 13.0f)
+            );
 
-            if (!inside) {
-                if (point_in_sphere_start_time >= 0.0) {
-                    RCLCPP_INFO(this->get_logger(), "Drone drifted out of tolerance");
-                    point_in_sphere_start_time = -1.0;
-                    time_inside_sphere = 0.0;
-                }
+            bool marker_valid = (now_time - last_marker_received_time < 0.3);
+            if (d_sphere <= 0.40f && marker_valid) {
+                visit_hold_time += loop_dt;
             } else {
-                if (point_in_sphere_start_time < 0.0) {
-                    point_in_sphere_start_time = now_dtime;
-                    RCLCPP_INFO(this->get_logger(), "Drone inside tolerance for 1st time");
-                } else {
-                    time_inside_sphere = now_dtime - point_in_sphere_start_time;
+                if (visit_hold_time > 0.0) {
+                    RCLCPP_INFO(this->get_logger(), "Drifted out of Visit sphere (d=%.2f) or lost marker. Resetting hold.", d_sphere);
                 }
+                visit_hold_time = 0.0;
             }
 
-            if (time_inside_sphere > max_time_inside_sphere) {
-                max_time_inside_sphere = time_inside_sphere;
-            }
-
-            if (time_inside_sphere >= 3.0) {
-                RCLCPP_INFO(this->get_logger(), "Hovered inside tolerance for 3 seconds! Waypoint reached.");
+            if (visit_hold_time >= 1.0) {
+                RCLCPP_INFO(this->get_logger(), "Stage 1 (Visit @ Z=13) COMPLETE! Descending to Z=14 for Stage 2 (Save)...");
                 break;
             }
-
             loop_rate.sleep();
         }
 
-        result->hov_time = static_cast<int32_t>(std::round(current_dtime - start_time));
+        // Transition to Stage 2: Save (descend to Z = 14, hold 2 seconds)
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            setpoint[2] = 14.0f;
+            prev_error[2] = setpoint[2] - drone_position[2];
+        }
+
+        double save_hold_time = 0.0;
+        while (rclcpp::ok()) {
+            if (goal_handle->is_canceling()) {
+                float cur_x, cur_y;
+                {
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    cur_x = drone_position[0];
+                    cur_y = drone_position[1];
+                    setpoint[0] = cur_x;
+                    setpoint[1] = cur_y;
+                    setpoint[2] = 13.0f;
+                }
+                goal_handle->canceled(result);
+                RCLCPP_INFO(this->get_logger(), "Goal canceled during Stage 2 Save. Holding at [%.2f, %.2f, 13.00]",
+                            cur_x, cur_y);
+                return;
+            }
+
+            float cur_x, cur_y, cur_z;
+            double now_time;
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                cur_x = drone_position[0];
+                cur_y = drone_position[1];
+                cur_z = drone_position[2];
+                now_time = current_dtime;
+            }
+
+            feedback->current_waypoint.pose.position.x = cur_x;
+            feedback->current_waypoint.pose.position.y = cur_y;
+            feedback->current_waypoint.pose.position.z = cur_z;
+            feedback->current_waypoint.header.stamp.sec = static_cast<int>(1.0 + save_hold_time);
+            goal_handle->publish_feedback(feedback);
+
+            float d_sphere = std::sqrt(
+                (cur_x - target_x) * (cur_x - target_x) +
+                (cur_y - target_y) * (cur_y - target_y) +
+                (cur_z - 14.0f) * (cur_z - 14.0f)
+            );
+
+            bool marker_valid = (now_time - last_marker_received_time < 0.3);
+            if (d_sphere <= 0.40f && marker_valid) {
+                save_hold_time += loop_dt;
+            } else {
+                if (save_hold_time > 0.0) {
+                    RCLCPP_INFO(this->get_logger(), "Drifted out of Save sphere (d=%.2f) or lost marker. Resetting hold.", d_sphere);
+                }
+                save_hold_time = 0.0;
+            }
+
+            if (save_hold_time >= 2.0) {
+                RCLCPP_INFO(this->get_logger(), "Stage 2 (Save @ Z=14) COMPLETE! Survivor SAVED!");
+                break;
+            }
+            loop_rate.sleep();
+        }
+
+        // Restore cruise altitude Z=13 and ascend back before completing goal
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            setpoint[2] = 13.0f;
+            prev_error[2] = setpoint[2] - drone_position[2];
+        }
+
+        while (rclcpp::ok()) {
+            float cur_z;
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                cur_z = drone_position[2];
+            }
+            if (cur_z <= 13.45f) {
+                break;
+            }
+            loop_rate.sleep();
+        }
+
+        result->hov_time = 3;
         goal_handle->succeed(result);
     }
 };
